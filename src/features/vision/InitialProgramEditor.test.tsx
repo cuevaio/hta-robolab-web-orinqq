@@ -14,6 +14,7 @@ const session = vi.hoisted(() => ({
   failWith: null as string | null,
   /** Solo la cámara: hay imagen, pero el modelo de gestos aún se prepara. */
   cameraOnly: false,
+  onProgress: null as ((percent: number) => void) | null,
 }));
 const voice = vi.hoisted(() => ({ speak: vi.fn() }));
 // La app no usa voz sintética: si algo llamara a la del navegador, estas pruebas lo verían.
@@ -22,9 +23,10 @@ vi.stubGlobal("SpeechSynthesisUtterance", class {});
 const sound = vi.hoisted(() => ({ playSound: vi.fn() }));
 vi.mock("../../shared/sound/sounds", () => ({ playSound: sound.playSound, shouldStepSound: () => true }));
 vi.mock("./cameraSession", () => ({
-  startCameraSession: (_video: HTMLVideoElement, callbacks: { onSample: typeof session.onSample; onCamera?: () => void; onReady: () => void; onError: (message: string) => void }) => {
+  startCameraSession: (_video: HTMLVideoElement, callbacks: { onSample: typeof session.onSample; onCamera?: () => void; onProgress?: (percent: number) => void; onReady: () => void; onError: (message: string) => void }) => {
     session.start();
     session.onSample = callbacks.onSample;
+    session.onProgress = callbacks.onProgress ?? null;
     if (session.failWith) callbacks.onError(session.failWith);
     else {
       callbacks.onCamera?.();
@@ -33,7 +35,7 @@ vi.mock("./cameraSession", () => ({
     return session.stop;
   },
 }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); session.onSample = null; session.failWith = null; session.cameraOnly = false; });
+afterEach(() => { cleanup(); vi.clearAllMocks(); session.onSample = null; session.failWith = null; session.cameraOnly = false; session.onProgress = null; });
 
 function Harness({ disabled = false, onExecute = vi.fn(), cameraHost }: { disabled?: boolean; onExecute?: () => void; cameraHost?: HTMLElement | null }) {
   const [state, dispatch] = useReducer(editorReducer, emptyEditor);
@@ -205,6 +207,13 @@ describe("programar Inicial: Gestos por defecto, Botones como alternativa", () =
     expect(copies.filter((n) => n.closest(".piece-tip"))).toHaveLength(1);
     const describedBy = screen.getByLabelText("Vista de tu cámara").getAttribute("aria-describedby")!;
     expect(document.getElementById(describedBy)?.textContent).toMatch(/recoge los otros dedos/);
+  });
+
+  it("mientras se prepara muestra cuánto lleva bajado el modelo", () => {
+    session.cameraOnly = true;
+    render(<Harness />);
+    act(() => session.onProgress?.(43));
+    expect(screen.getByText("Preparando los gestos… 43 %")).toBeTruthy();
   });
 
   it("ningún comando se dice en voz alta (ni «Arriba» ni «Avanzar»): ni por gesto ni tocando, en Gestos o en Botones", () => {

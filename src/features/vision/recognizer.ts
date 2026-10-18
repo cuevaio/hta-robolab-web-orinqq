@@ -4,14 +4,20 @@ import type { GestureSample } from "./gestureGate";
 export type RecognitionMessage =
   | { type: "ready" }
   | { type: "sample"; sample: GestureSample; time: number; session: number }
+  | { type: "progress"; loaded: number; total: number }
   | { type: "error" };
 
 /** Cuánto sigue vivo el reconocedor sin cámara: al pasar a Botones y volver a Gestos no se espera otra vez. */
 export const IDLE_MS = 5 * 60_000;
 
-type Camera = { onSample: (sample: GestureSample, time: number) => void; onError: () => void };
+type Camera = {
+  onSample: (sample: GestureSample, time: number) => void;
+  onError: () => void;
+  /** Porcentaje (0 a 100) del modelo que ya está bajado. */
+  onProgress?: (percent: number) => void;
+};
 
-type Shared = { worker: Worker; ready: Promise<void>; cameras: Map<number, Camera>; idle: number | undefined };
+type Shared = { worker: Worker; ready: Promise<void>; cameras: Map<number, Camera>; idle: number | undefined; progress: number | null };
 
 export type RecognizerUse = {
   readonly session: number;
@@ -40,7 +46,7 @@ function create(): Shared {
   });
   // Si falla sin ninguna cámara esperando, que no quede como un rechazo sin manejar.
   ready.catch(() => undefined);
-  const state: Shared = { worker, ready, cameras: new Map(), idle: undefined };
+  const state: Shared = { worker, ready, cameras: new Map(), idle: undefined, progress: null };
   const broken = () => {
     reject(new Error("No se pudo cargar el reconocedor de gestos."));
     const cameras = [...state.cameras.values()];
@@ -52,7 +58,10 @@ function create(): Shared {
     const message = event.data;
     if (message.type === "ready") resolve();
     else if (message.type === "error") broken();
-    else state.cameras.get(message.session)?.onSample(message.sample, message.time);
+    else if (message.type === "progress") {
+      state.progress = message.total > 0 ? Math.min(100, Math.round((message.loaded / message.total) * 100)) : null;
+      if (state.progress !== null) for (const camera of state.cameras.values()) camera.onProgress?.(state.progress);
+    } else state.cameras.get(message.session)?.onSample(message.sample, message.time);
   };
   worker.postMessage({ type: "init" });
   return state;
@@ -86,6 +95,8 @@ export function attachRecognizer(camera: Camera): RecognizerUse {
   state.idle = undefined;
   const session = ++lastSession;
   state.cameras.set(session, camera);
+  // La cámara que llega con la descarga a medias se entera de cuánto va.
+  if (state.progress !== null) camera.onProgress?.(state.progress);
   return {
     session,
     ready: state.ready,
