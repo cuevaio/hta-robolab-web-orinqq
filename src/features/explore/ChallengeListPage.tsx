@@ -1,9 +1,11 @@
+import { useEffect } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { KIND_LABEL, challengesFor, topicInfo } from "@robolab/backend/domain/explore/challenges";
 import { ACTIVE_LEVELS, type EducationLevel } from "@robolab/backend/domain/game/levels";
 import { missionsFor } from "@robolab/backend/domain/lab/mission";
 import { Icon } from "../../shared/ui/Icon";
 import { MissionThumb } from "../lab/MissionThumb";
+import { warmUpRecognizer } from "../vision/recognizer";
 import { countLabel, openCountFor } from "./catalog";
 import { Breadcrumbs, ExploreLayout, LEVEL_INFO } from "./ExploreLayout";
 import { useExploreProgress } from "./storage";
@@ -13,6 +15,10 @@ const isLevel = (value: string): value is EducationLevel => (ACTIVE_LEVELS as re
 /** Los retos de un tópico y nivel: en Primaria son misiones (tablero con energía); en los demás, retos de bloques. */
 export function ChallengeListPage() {
   const { topic: topicId = "", level = "" } = useParams();
+  // Los retos de Inicial usan la cámara: el modelo de gestos (~12 MB) se baja mientras el niño elige.
+  useEffect(() => {
+    if (level === "inicial") warmUpRecognizer();
+  }, [level]);
   const topic = topicInfo(topicId);
   const { progress } = useExploreProgress();
   if (!topic || !topic.available || !isLevel(level)) return <Navigate to="/" replace />;

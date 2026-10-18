@@ -219,18 +219,49 @@ git commit -m "Backend al día"
 Si TypeScript marca una función o un tipo que ya no existe, el backend cambió
 su contrato: ajustar la web en ese mismo cambio.
 
-## Robot por Bluetooth Classic
+## Robot por USB (opción inicial)
 
-La hoja **Robot → Bluetooth** conecta directamente con el ESP32 clásico usando
-Web Serial. Convex mantiene las clases y los resultados; el robot no necesita
+La hoja **Robot → USB** usa el cable USB de datos del ESP32 con Web Serial en
+Chrome de escritorio, por HTTPS o localhost. No requiere emparejar Bluetooth ni
+activar opciones experimentales. El cable debe permanecer conectado durante el
+recorrido; el robot conserva su alimentación habitual para los motores.
+
+1. Cargar el sketch completo `firmware/robi/robi.ino` del backend. El transporte
+   predeterminado es USB a **115200 baudios**; motores, ojos, luces, sonidos y
+   calibración se conservan.
+2. Conectar el cable y cerrar el monitor serie de Arduino y otras aplicaciones
+   que usen ese puerto.
+3. En el reto, tocar **Robot → USB → Elegir puerto USB** y elegir **USB Serial**,
+   **CH340** o el puerto de la placa.
+4. Esperar **Robot conectado**: la web lo muestra cuando responde el firmware.
+
+Abrir USB puede reiniciar la placa. Durante esa espera la web repite únicamente
+el saludo, con un límite de ocho segundos. Antes de abrir la sesión invalida
+cualquier trama incompleta y envía STOP. Al desconectar, no repite programas;
+el firmware conserva la parada de seguridad al perder los latidos.
+
+**Ejecutar** envía la secuencia una vez. **Parar robot** sigue disponible aunque
+el tablero ya haya terminado. Si falla la apertura, revisar el cable, los
+permisos del puerto y que ninguna otra aplicación lo tenga abierto.
+
+Referencia: [Web Serial en Chrome](https://developer.chrome.com/docs/capabilities/serial).
+
+## Robot por Bluetooth BLE (opcional)
+
+La hoja **Robot → Bluetooth** conecta directamente con el ESP32 usando
+Web Bluetooth (BLE). Convex mantiene las clases y los resultados; el robot no necesita
 wifi para recibir los movimientos. El modo **Wifi** conserva la conexión por código.
 
-1. Cargar el sketch completo `firmware/robi/robi.ino` del backend. Incluye los
+1. Habilitar el modo BLE del firmware (`ROBOLAB_USAR_BLE=1`) y cargar el sketch
+   completo `firmware/robi/robi.ino` del backend. Incluye los
    motores, ojos, luces y sonidos en un solo archivo; no necesita copiar `.h`.
-2. Emparejar **RoboLab** una vez en los ajustes Bluetooth de la computadora.
-   Puede quedar como desconectado en Ubuntu: el puerto se abre desde la web.
-3. Abrir la web por HTTPS o localhost en Chrome o Edge de escritorio actualizado.
-4. En el reto, tocar **Robot → Elegir robot** y seleccionar su puerto Bluetooth.
+   El firmware anterior de Bluetooth Classic no ofrece el servicio BLE requerido.
+2. Activar Bluetooth en el equipo. El robot se elige desde la web; no hay que
+   emparejarlo en los ajustes del sistema.
+3. Abrir la web por HTTPS o localhost en **Chrome** actualizado. En Ubuntu/Linux,
+   habilitar una vez **Experimental Web Platform features** en
+   `chrome://flags/#enable-experimental-web-platform-features` y reiniciar Chrome.
+4. En el reto, tocar **Robot → Elegir robot** y seleccionar **RoboLab**.
    El chip solo cambia a conectado después de que responde el firmware.
 
 **Ejecutar** envía al robot vinculado en los retos de bloques. La hoja permite
@@ -246,21 +277,21 @@ calibración física; el recorrido dibujado no verifica el movimiento real.
 El contrato, pines y pruebas de aceptación están en
 [robot-bluetooth.md del backend](https://github.com/orinqq/robolab-backend/blob/main/docs/robot-bluetooth.md).
 El lockfile fija el commit del backend oficial por `git+https`.
-La API requiere un navegador con Web Serial;
-si no está disponible, se muestra la alternativa Wifi. Firefox y Zen no ofrecen
-esta conexión Bluetooth Classic de forma nativa.
+La API requiere Web Bluetooth; Chrome es el navegador priorizado. Si no está
+disponible, se muestra cómo habilitarlo y la alternativa Wifi. Firefox, Zen y
+Safari no ofrecen esta conexión BLE de forma nativa.
 
-Al volver a conectar, la web espera que termine de cerrarse el puerto anterior,
+Al volver a conectar, la web espera que termine de cerrarse la conexión anterior,
 también al cambiar de reto. Usa el robot en una sola pestaña o navegador a la vez.
 Si falla, **Detalles de conexión** conserva la etapa y el error del navegador.
 Comprueba que RoboLab esté encendido y cerca, desconéctalo de otros equipos y
-reinícialo. En Ubuntu, si tampoco aparece al buscar dispositivos y el sistema
-informa `Host is down` o `br-connection-page-timeout`, hay que recuperar primero
-el enlace Bluetooth del sistema. Las advertencias `Serial blocklist` sobre
-servicios de audio de otros dispositivos no indican un fallo del puerto SPP de RoboLab.
+vuelve a elegirlo. La web obtiene servicios y características nuevos en cada
+conexión y nunca reenvía automáticamente un programa tras un corte. Si RoboLab
+no aparece en el selector, comprueba que tenga cargado el firmware BLE y que no
+esté conectado a otro equipo.
 
-Referencias: [Bluetooth RFCOMM con Web Serial](https://developer.chrome.com/blog/serial-over-bluetooth)
-y [compatibilidad de Web Serial](https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API).
+Referencias: [Web Bluetooth en Chrome](https://developer.chrome.com/docs/capabilities/bluetooth)
+y [estado de implementación por plataforma](https://github.com/whatwg/bluetooth/blob/main/implementation-status.md).
 
 ## Pruebas y calidad
 
@@ -340,6 +371,6 @@ puede actualizarse a `orinqq/robolab-backend#main` con el comando habitual.
 
 ### Generación en Jetson por USB
 
-El asistente docente permite elegir «Nube» o «Jetson por USB». La opción local usa Qwen 2.5 3B Instruct mediante el conector de la laptop; el navegador no llama al proveedor cloud cuando se elige Jetson. Las propuestas locales también pasan por Convex antes de mostrarse y al guardarse: la sesión, revisión y asignación siguen necesitando internet.
+El asistente docente permite elegir «Nube» o «Jetson por USB». La opción local usa Qwen 2.5 3B Instruct mediante un puerto USB serial elegido con «Conectar Jetson»; el navegador no llama al proveedor cloud cuando se elige Jetson. Las propuestas locales también pasan por Convex antes de mostrarse y al guardarse: la sesión, revisión y asignación siguen necesitando internet.
 
-La preparación de Ollama, el túnel USB y el conector está en la [guía del backend](https://github.com/orinqq/robolab-backend/blob/main/docs/JETSON.md). La web accede al conector en `http://127.0.0.1:8765`; no necesita nuevas variables `VITE_…` ni claves de modelos. El navegador puede pedir permiso de acceso a red local.
+La preparación de Ollama y del servicio de la Jetson está en la [guía del backend](https://github.com/orinqq/robolab-backend/blob/main/docs/JETSON.md). Cada computadora necesita un navegador de escritorio con Web Serial, como Chrome o Edge, reconocer el puerto USB y dar permiso para usarlo. No requiere instalar Node, un acompañante ni SSH en esa computadora, compartir Wi-Fi, ni nuevas variables `VITE_…` o claves de modelos. La web debe abrirse por HTTPS o localhost y su backend debe incluir `agent.reviewLocal`.
