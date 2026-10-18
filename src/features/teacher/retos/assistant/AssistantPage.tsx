@@ -272,7 +272,7 @@ export function AssistantPage() {
                   <p className="proposal-title">{p.mission.title}</p>
                   <MissionPreview mission={p.mission} />
                   <p className="small proposal-energy">
-                    <span aria-hidden="true">🔋</span> Energía mínima {p.metrics.minimumEnergy ?? "—"} de {p.mission.energyBudget}
+                    <span aria-hidden="true">🔋</span> Energía mínima {p.metrics.minimumEnergy ?? "—"} de {p.mission.energyBudget}{p.alternativeCost !== null && ` · otra ruta cuesta ${p.alternativeCost}`}
                   </p>
                   <div className="row">
                     <button

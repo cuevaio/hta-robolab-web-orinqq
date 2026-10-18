@@ -20,7 +20,7 @@ vi.mock("convex/react", () => ({
 import { AssistantPage } from "./AssistantPage";
 
 const M = (grade: 2 | 3 | 4) => missionFixtures.find((m) => m.grade === grade)!;
-const proposal = (grade: 2 | 3 | 4) => ({ grade, mission: M(grade), metrics: { solutionStatus: "SOLVED", minimumEnergy: 6 } });
+const proposal = (grade: 2 | 3 | 4, alternativeCost: number | null = 11) => ({ grade, mission: M(grade), metrics: { solutionStatus: "SOLVED", minimumEnergy: 6 }, alternativeCost });
 const OBJETIVO = "Comparar sumas de costos y elegir un recorrido con presupuesto limitado.";
 
 beforeEach(() => {
@@ -185,6 +185,18 @@ describe("asistente: revisar y guardar (G3)", () => {
     expect(within(cards[0]!).getByText(/Energía mínima 6 de/)).toBeTruthy();
     expect(screen.getByText("2 misiones elegidas")).toBeTruthy();
     expect(screen.queryByText(/No pasó la revisión/i)).toBeNull();
+  });
+
+  it("dice cuánto cuesta otra ruta posible, para comparar con la energía mínima", async () => {
+    generate.mockResolvedValue({ status: "ok", proposals: [proposal(2, 11), proposal(3, null)], failed: [] });
+    renderPage();
+    type();
+    fireEvent.click(propose());
+    await screen.findByRole("heading", { name: "Revisa las propuestas" });
+    const cards = within(screen.getByRole("list", { name: "Propuestas" })).getAllByRole("listitem");
+    expect(within(cards[0]!).getByText(/Energía mínima 6 de .* · otra ruta cuesta 11/)).toBeTruthy();
+    // Sin otra ruta distinta no se inventa la cifra.
+    expect(within(cards[1]!).getByText(/Energía mínima 6 de/).textContent).not.toMatch(/otra ruta/);
   });
 
   it("lo que no pasó la revisión no se muestra como tarjeta; solo se avisa para qué grados hubo propuesta", async () => {
