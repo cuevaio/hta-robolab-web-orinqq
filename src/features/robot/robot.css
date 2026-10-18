@@ -1,4 +1,13 @@
-/* Robot por wifi: botón "Robot" (F2), chip RobotSync (F1) y hoja "Sincronizar con robot" (M5). */
+/* Conexión Bluetooth Classic o wifi: botón Robot y hoja de sincronización. */
+
+.robot-result {
+  margin-top: 16px;
+}
+
+.robot-sheet .btn[aria-pressed="true"] {
+  background: var(--c-action);
+  color: var(--c-action-ink);
+}
 
 .robot-dot {
   width: 10px;

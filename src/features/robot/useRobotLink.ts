@@ -1,110 +1,78 @@
-import { useMutation, useQuery } from "convex/react";
-import { useCallback, useEffect, useState } from "react";
-import { api } from "@robolab/backend/convex/_generated/api";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { Program } from "@robolab/backend/domain/game/program";
+import { toRobotText } from "@robolab/backend/domain/robot/protocol";
+import { bluetoothProgramProblem } from "@robolab/backend/domain/robot/bluetooth";
 import { userMessage } from "../../shared/errors";
 import { useToast } from "../../shared/ui/Toast";
+import { createBluetoothLink } from "./bluetoothLink";
+import { useWifiRobotLink } from "./useWifiRobotLink";
 
-const ROBOT_KEY = "robolab.robot";
-/** El robot consulta cada medio segundo; si no aparece en 10 s, está apagado o sin wifi. */
-export const ONLINE_MS = 10_000;
-
-function readLinked(): string {
-  try {
-    return window.localStorage.getItem(ROBOT_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-/** Id por envío. `randomUUID` no existe en http://192.168… (sin https): se usa un reemplazo. */
-const requestId = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-function writeLinked(code: string) {
-  try {
-    if (code) window.localStorage.setItem(ROBOT_KEY, code);
-    else window.localStorage.removeItem(ROBOT_KEY);
-  } catch {
-    // Sin almacenamiento, el robot queda vinculado solo mientras dure la pestaña.
-  }
-}
-
-/** Los tres estados del chip RobotSync del Figma (F1). */
-export type SyncState = "off" | "searching" | "on";
-
+export type { SyncState } from "./useWifiRobotLink";
+export type RobotTransport = "bluetooth" | "wifi";
 export type RobotSync = ReturnType<typeof useRobotLink>;
+const TRANSPORT_KEY = "robolab.robot.transport";
+function savedTransport(): RobotTransport {
+  try { return localStorage.getItem(TRANSPORT_KEY) === "wifi" ? "wifi" : "bluetooth"; }
+  catch { return "bluetooth"; }
+}
 
-/**
- * Vínculo con el robot físico (ESP32 por wifi): el código guardado en este
- * dispositivo, lo que el servidor sabe de ese robot y el envío de programas.
- * Lo comparten el botón "Robot" de la pantalla y la hoja "Sincronizar con robot".
- */
+/** La ejecución del reto y la hoja Robot comparten una única conexión física. */
 export function useRobotLink() {
-  const [code, setCode] = useState(readLinked);
-  const [now, setNow] = useState(() => Date.now());
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [transport, selectTransport] = useState(savedTransport);
+  const [bluetooth] = useState(() => createBluetoothLink());
+  const connection = useSyncExternalStore(bluetooth.subscribe, bluetooth.getSnapshot);
+  const wifi = useWifiRobotLink(transport === "wifi");
+  const [localError, setLocalError] = useState<string | null>(null);
   const toast = useToast();
-  const sendMutation = useMutation(api.robot.send);
-  const status = useQuery(api.robot.status, code ? { code } : "skip");
+  const isBluetooth = transport === "bluetooth";
 
-  // Reloj para saber si el robot sigue dando señal.
   useEffect(() => {
-    if (!code) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 2000);
-    return () => window.clearInterval(timer);
-  }, [code]);
+    const leave = () => { void bluetooth.disconnect(); };
+    window.addEventListener("pagehide", leave);
+    return () => { window.removeEventListener("pagehide", leave); leave(); };
+  }, [bluetooth]);
 
-  const online = status != null && status.lastSeenAt != null && now - status.lastSeenAt < ONLINE_MS;
-  const expired = status != null && status.codeExpiresAt <= now;
-  const state: SyncState = !code ? "off" : status === undefined ? "searching" : online && !expired ? "on" : "off";
+  useEffect(() => {
+    if (isBluetooth && connection.error) toast(connection.error, { tone: "error" });
+  }, [connection.error, isBluetooth, toast]);
 
-  /** Por qué no está conectado, en palabras para el usuario (null si está conectado o buscando). */
-  const problem =
-    state !== "off" || !code
-      ? null
-      : status === null
-        ? "No encontramos ese robot. Revisa el código de su etiqueta."
-        : expired
-          ? "El robot muestra un código nuevo cada 12 horas. Toca «Cambiar de robot» y escríbelo."
-          : "El robot no responde. Revisa que esté encendido y con wifi.";
+  const setTransport = useCallback((next: RobotTransport) => {
+    if (bluetooth.getSnapshot().busy) return;
+    if (next === "wifi") void bluetooth.disconnect();
+    setLocalError(null);
+    selectTransport(next);
+    try { localStorage.setItem(TRANSPORT_KEY, next); } catch { /* Preferencia solo en esta pantalla. */ }
+  }, [bluetooth]);
 
-  const link = useCallback(
-    (next: string, name: string) => {
-      writeLinked(next);
-      setCode(next);
-      setError(null);
-      toast(`Conectado a ${name}.`);
-    },
-    [toast],
-  );
+  const send = useCallback(async (program: Program) => {
+    if (!isBluetooth) { await wifi.send(program); return; }
+    if (program.length === 0 || bluetooth.getSnapshot().state !== "on") return;
+    setLocalError(null);
+    try { await bluetooth.send(toRobotText(program)); }
+    catch (error) {
+      const message = userMessage(error, "No pudimos enviar el programa.");
+      setLocalError(message); toast(message, { tone: "error" });
+    }
+  }, [bluetooth, isBluetooth, wifi, toast]);
 
-  const unlink = useCallback(() => {
-    writeLinked("");
-    setCode("");
-    setError(null);
-  }, []);
+  function programProblem(program: Program): string | null {
+    if (!isBluetooth || !connection.commands || !program.length) return null;
+    try { return bluetoothProgramProblem(toRobotText(program), connection.commands); }
+    catch (error) { return userMessage(error, "El programa no es válido."); }
+  }
 
-  const send = useCallback(
-    async (program: Program) => {
-      if (!code || program.length === 0) return;
-      setBusy(true);
-      setError(null);
-      try {
-        // Un id por envío: si la red reintenta, el robot no lo hace dos veces.
-        const result = await sendMutation({ code, program: [...program], requestId: requestId() });
-        toast(`Enviado a ${result.robotName}: ${result.letters}`);
-      } catch (e) {
-        const message = userMessage(e, "No pudimos enviar el programa al robot.");
-        setError(message);
-        toast(message, { tone: "error" });
-      } finally {
-        setBusy(false);
-      }
-    },
-    [code, sendMutation, toast],
-  );
-
-  return { code, status, state, online, expired, problem, busy, error, link, unlink, send };
+  return {
+    ...wifi,
+    transport, setTransport, send, programProblem,
+    state: isBluetooth ? connection.state : wifi.state,
+    online: isBluetooth ? connection.state === "on" : wifi.online,
+    busy: isBluetooth ? connection.busy : wifi.busy,
+    error: isBluetooth ? localError ?? connection.error : wifi.error,
+    problem: isBluetooth ? null : wifi.problem,
+    supported: bluetooth.supported,
+    bluetooth: connection,
+    connect: bluetooth.connect,
+    disconnect: bluetooth.disconnect,
+    stop: bluetooth.stop,
+  };
 }

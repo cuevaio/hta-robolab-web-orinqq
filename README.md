@@ -219,13 +219,42 @@ git commit -m "Backend al día"
 Si TypeScript marca una función o un tipo que ya no existe, el backend cambió
 su contrato: ajustar la web en ese mismo cambio.
 
+## Robot por Bluetooth Classic
+
+La hoja **Robot → Bluetooth** conecta directamente con el ESP32 clásico usando
+Web Serial. Convex mantiene las clases y los resultados; el robot no necesita
+wifi para recibir los movimientos. El modo **Wifi** conserva la conexión por código.
+
+1. Cargar el sketch completo `firmware/robi/robi.ino` del backend. Incluye los
+   motores, ojos, luces y sonidos en un solo archivo; no necesita copiar `.h`.
+2. Emparejar **RoboLab** en los ajustes Bluetooth de la laptop.
+3. Abrir la web por HTTPS o localhost en Chrome de escritorio (117 o superior).
+4. En el reto, tocar **Robot → Elegir robot** y seleccionar su puerto Bluetooth.
+   El chip solo cambia a conectado después de que responde el firmware.
+
+**Ejecutar** envía al robot vinculado en los retos de bloques. La hoja permite
+enviar manualmente y **Parar robot** queda disponible durante la ejecución,
+incluso si el tablero ya muestra el resultado. Salir del reto cierra el enlace.
+Los latidos permiten al firmware detener motores ante una conexión perdida;
+mantener la pestaña activa durante el recorrido.
+
+El montaje actual de dos MOSFET solo admite avance y giros **en arco**. Si el
+programa contiene retroceso, la web lo avisa y no lo envía. Los tiempos necesitan
+calibración física; el recorrido dibujado no verifica el movimiento real.
+
+El contrato, pines y pruebas de aceptación están en
+[robot-bluetooth.md del backend](https://github.com/orinqq/robolab-backend/blob/main/docs/robot-bluetooth.md).
+El lockfile fija el commit del backend oficial por `git+https`.
+La API requiere un navegador con Web Serial;
+si no está disponible, se muestra la alternativa Wifi.
+
 ## Pruebas y calidad
 
 ```bash
 npm run verify     # tipos + lint + pruebas + build
 ```
 
-Las pruebas de la web (Vitest) cubren el adaptador wifi del robot, el editor
+Las pruebas de la web (Vitest) cubren los adaptadores Bluetooth y wifi del robot, el editor
 de preguntas, la gráfica de progreso y el aviso de conexión. Las del dominio y
 del backend corren en el repo del backend. GitHub Actions corre `npm run verify`
 en cada push y pull request. Las reglas para colaborar (personas o agentes de IA)

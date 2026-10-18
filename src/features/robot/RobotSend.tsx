@@ -29,7 +29,8 @@ const ROBOT_ERRORS: Record<string, string> = {
 const CHIP: Record<SyncState, string> = { off: "Robot sin conectar", searching: "Buscando robot…", on: "Robot conectado" };
 const BUTTON: Record<SyncState, string> = { off: "Robot", searching: "Buscando…", on: "Robot OK" };
 
-const STEPS = ["Enciende el robot", "Mira su código en la pantalla o en el monitor", "Escríbelo aquí"];
+const WIFI_STEPS = ["Enciende el robot", "Mira su código en la pantalla o en el monitor", "Escríbelo aquí"];
+const BLUETOOTH_STEPS = ["Enciende el robot", "Empareja RoboLab en los ajustes Bluetooth de tu laptop", "Toca «Elegir robot» y selecciona su puerto"];
 
 /** `showModal` atrapa el foco y bloquea el fondo; donde no existe (navegadores viejos) se abre sin modal. */
 function openDialog(dialog: HTMLDialogElement) {
@@ -52,8 +53,8 @@ type Props = {
 
 /**
  * Botón "Robot" (sin conectar / Buscando… / Robot OK) que abre la hoja
- * "Sincronizar con robot". El robot va por wifi: se escribe el código que
- * muestra, no se elige de una lista de dispositivos.
+ * "Sincronizar con robot". Bluetooth Classic SPP es la opción inicial;
+ * wifi conserva el emparejamiento por código para firmware anterior.
  */
 export function RobotSend({ robot, program, disabled }: Props) {
   const [open, setOpen] = useState(false);
@@ -85,14 +86,24 @@ export function RobotSend({ robot, program, disabled }: Props) {
         <span className="robot-dot" aria-hidden="true" />
         {BUTTON[robot.state]}
       </button>
-      <dialog ref={dialog} className="dialog sheet robot-sheet" aria-labelledby={titleId} onClose={() => setOpen(false)}>
+      {!open && robot.transport === "bluetooth" && robot.busy && (
+        <button className="btn btn-danger" type="button" onClick={() => void robot.stop()}>Parar robot</button>
+      )}
+      <dialog ref={dialog} className="dialog sheet robot-sheet" aria-labelledby={titleId} onClose={() => {
+        setOpen(false);
+        if (robot.transport === "bluetooth" && robot.state === "searching") void robot.disconnect();
+      }}>
         <span className="sheet-handle" aria-hidden="true" />
         <h2 id={titleId} tabIndex={-1} style={{ margin: 0 }}>
           Sincronizar con robot
         </h2>
         <p className="small muted">Opcional. Tu secuencia también se ejecutará en el robot.</p>
+        <div className="row" role="group" aria-label="Conexión del robot">
+          <button className="btn btn-sm" type="button" aria-pressed={robot.transport === "bluetooth"} disabled={robot.busy} onClick={() => robot.setTransport("bluetooth")}>Bluetooth</button>
+          <button className="btn btn-sm" type="button" aria-pressed={robot.transport === "wifi"} disabled={robot.busy} onClick={() => robot.setTransport("wifi")}>Wifi</button>
+        </div>
         <ol className="robot-steps">
-          {STEPS.map((step, i) => (
+          {(robot.transport === "bluetooth" ? BLUETOOTH_STEPS : WIFI_STEPS).map((step, i) => (
             <li key={step}>
               <span className="robot-step-n" aria-hidden="true">
                 {i + 1}
@@ -105,10 +116,39 @@ export function RobotSend({ robot, program, disabled }: Props) {
           <span className="robot-dot" aria-hidden="true" />
           {CHIP[robot.state]}
         </span>
-        {open && <SheetBody robot={robot} program={program} disabled={disabled} onDone={() => setOpen(false)} />}
+        {open && (robot.transport === "bluetooth"
+          ? <BluetoothBody robot={robot} program={program} disabled={disabled} onDone={() => setOpen(false)} />
+          : <SheetBody robot={robot} program={program} disabled={disabled} onDone={() => setOpen(false)} />)}
       </dialog>
     </>
   );
+}
+
+const BLUETOOTH_STEP = { sending: "Enviando programa…", received: "El robot recibió el programa.", running: "El robot lo está haciendo…", done: "¡El robot terminó!", failed: "El programa se detuvo." };
+
+function BluetoothBody({ robot, program, disabled, onDone }: Props & { onDone: () => void }) {
+  const problem = robot.programProblem(program);
+  const last = robot.bluetooth.last;
+  return <div className="stack">
+    {!robot.supported && <p className="hint">Abre RoboLab en Chrome de laptop por HTTPS o localhost para usar Bluetooth Classic. También puedes conectar por Wifi.</p>}
+    {robot.state !== "on" ? <div className="row sheet-actions">
+      <button className="btn" type="button" onClick={() => { void robot.disconnect(); onDone(); }}>Cancelar</button>
+      <button className="btn btn-primary" type="button" disabled={!robot.supported || robot.state === "searching"} onClick={() => void robot.connect()}>
+        {robot.state === "searching" ? "Conectando…" : "Elegir robot"}
+      </button>
+    </div> : <>
+      <p className="small muted">Bluetooth Classic conectado. {robot.bluetooth.turns === "arc" ? "Este robot hace giros en arco; calibra el recorrido físico." : "El robot gira sobre su centro."}</p>
+      {problem && <p className="hint" role="status">{problem}</p>}
+      {last && <p className="small muted" role="status"><span className="code">{last.letters}</span> · {BLUETOOTH_STEP[last.status]}</p>}
+      <div className="row sheet-actions">
+        {robot.busy ? <button className="btn btn-danger" type="button" onClick={() => void robot.stop()}>Parar robot</button> :
+          <button className="btn" type="button" disabled={disabled || !program.length || !!problem} onClick={() => void robot.send(program)}><Icon name="play" /> Enviar al robot</button>}
+        <button className="btn btn-primary" type="button" onClick={onDone}>Robot OK</button>
+      </div>
+      <button className="link-btn small" type="button" onClick={() => void robot.disconnect()}>Desconectar robot</button>
+    </>}
+    {robot.error && <p className="alert alert-error" role="alert">{robot.error}</p>}
+  </div>;
 }
 
 function SheetBody({ robot, program, disabled, onDone }: Props & { onDone: () => void }) {

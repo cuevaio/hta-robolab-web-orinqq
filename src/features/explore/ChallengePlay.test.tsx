@@ -102,6 +102,7 @@ describe("pantalla del reto: Robot y Ejecutar", () => {
   });
 
   it("con un robot conectado, Ejecutar también manda la secuencia al robot", async () => {
+    window.localStorage.setItem("robolab.robot.transport", "wifi");
     window.localStorage.setItem(ROBOT_KEY, "K7Q4MZ");
     status.mockReturnValue({ name: "Wayra-12", lastSeenAt: NOW - 1000, codeExpiresAt: NOW + 3_600_000, lastCommand: null });
     renderChallenge();
