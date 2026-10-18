@@ -378,7 +378,7 @@ function ChallengePage({ challenge }: { challenge: Challenge }) {
           }}
         />
       )}
-      {phase === "done" && robot.transport === "bluetooth" && robot.state === "on" && (
+      {phase === "done" && robot.transport !== "wifi" && robot.state === "on" && (
         <div className="stack robot-result">
           {robot.busy && <p className="small" role="status">El robot físico sigue ejecutando el programa.</p>}
           <div className="row"><RobotSend robot={robot} program={[]} disabled /></div>

@@ -219,13 +219,41 @@ git commit -m "Backend al día"
 Si TypeScript marca una función o un tipo que ya no existe, el backend cambió
 su contrato: ajustar la web en ese mismo cambio.
 
-## Robot por Bluetooth BLE
+## Robot por USB (opción inicial)
+
+La hoja **Robot → USB** usa el cable USB de datos del ESP32 con Web Serial en
+Chrome de escritorio, por HTTPS o localhost. No requiere emparejar Bluetooth ni
+activar opciones experimentales. El cable debe permanecer conectado durante el
+recorrido; el robot conserva su alimentación habitual para los motores.
+
+1. Cargar el sketch completo `firmware/robi/robi.ino` del backend. El transporte
+   predeterminado es USB a **115200 baudios**; motores, ojos, luces, sonidos y
+   calibración se conservan.
+2. Conectar el cable y cerrar el monitor serie de Arduino y otras aplicaciones
+   que usen ese puerto.
+3. En el reto, tocar **Robot → USB → Elegir puerto USB** y elegir **USB Serial**,
+   **CH340** o el puerto de la placa.
+4. Esperar **Robot conectado**: la web lo muestra cuando responde el firmware.
+
+Abrir USB puede reiniciar la placa. Durante esa espera la web repite únicamente
+el saludo, con un límite de ocho segundos. Antes de abrir la sesión invalida
+cualquier trama incompleta y envía STOP. Al desconectar, no repite programas;
+el firmware conserva la parada de seguridad al perder los latidos.
+
+**Ejecutar** envía la secuencia una vez. **Parar robot** sigue disponible aunque
+el tablero ya haya terminado. Si falla la apertura, revisar el cable, los
+permisos del puerto y que ninguna otra aplicación lo tenga abierto.
+
+Referencia: [Web Serial en Chrome](https://developer.chrome.com/docs/capabilities/serial).
+
+## Robot por Bluetooth BLE (opcional)
 
 La hoja **Robot → Bluetooth** conecta directamente con el ESP32 usando
 Web Bluetooth (BLE). Convex mantiene las clases y los resultados; el robot no necesita
 wifi para recibir los movimientos. El modo **Wifi** conserva la conexión por código.
 
-1. Cargar el nuevo sketch BLE completo `firmware/robi/robi.ino` del backend. Incluye los
+1. Habilitar el modo BLE del firmware (`ROBOLAB_USAR_BLE=1`) y cargar el sketch
+   completo `firmware/robi/robi.ino` del backend. Incluye los
    motores, ojos, luces y sonidos en un solo archivo; no necesita copiar `.h`.
    El firmware anterior de Bluetooth Classic no ofrece el servicio BLE requerido.
 2. Activar Bluetooth en el equipo. El robot se elige desde la web; no hay que

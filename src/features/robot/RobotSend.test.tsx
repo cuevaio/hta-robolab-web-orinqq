@@ -14,6 +14,7 @@ vi.mock("convex/react", () => ({
 import { RobotSend } from "./RobotSend";
 import { useRobotLink } from "./useRobotLink";
 import { bleTestDevice } from "./bleTestDevice";
+import { serialTestDevice } from "./serialTestDevice";
 
 const NOW = Date.UTC(2026, 9, 17, 20, 0);
 const ROBOT_KEY = "robolab.robot";
@@ -36,6 +37,7 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   window.localStorage.removeItem(ROBOT_KEY);
   window.localStorage.removeItem("robolab.robot.transport");
+  window.localStorage.removeItem("robolab.robot.transport.v2");
   status.mockReset();
 });
 
@@ -102,6 +104,7 @@ describe("sincronizar con robot (wifi)", () => {
 });
 
 describe("sincronizar con robot (BLE)", () => {
+  beforeEach(() => window.localStorage.setItem("robolab.robot.transport.v2", "bluetooth"));
   it("cerrar la hoja durante el selector cancela la conexión pendiente", async () => {
     const peripheral = bleTestDevice();
     let choose!: (device: typeof peripheral.device) => void;
@@ -164,5 +167,37 @@ describe("sincronizar con robot (BLE)", () => {
     await waitFor(() => expect(peripheral.frames).toContain("STOP\n"));
     unmount();
     await waitFor(() => expect(peripheral.gatt.connected).toBe(false));
+  });
+});
+
+describe("sincronizar con robot (USB)", () => {
+  it("prioriza USB aunque antes se haya elegido Bluetooth y explica el cable sin flags", () => {
+    localStorage.setItem("robolab.robot.transport", "bluetooth");
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: /Sincronizar con robot/ }));
+    const sheet = within(screen.getByRole("dialog"));
+    expect(sheet.getByRole("button", { name: "USB" }).getAttribute("aria-pressed")).toBe("true");
+    expect(sheet.getByText(/cable USB de datos/)).toBeTruthy();
+    expect(sheet.getByText(/Chrome.*Web Serial/)).toBeTruthy();
+    expect(sheet.queryByText(/Experimental Web Platform/)).toBeNull();
+    expect(sheet.queryByLabelText("Código del robot")).toBeNull();
+  });
+
+  it("conecta USB, conserva el enlace al cerrar la hoja y mantiene Parar robot accesible", async () => {
+    const device = serialTestDevice();
+    Object.defineProperty(navigator, "serial", { configurable: true, value: device.serial });
+    const view = render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: /Sincronizar con robot/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Elegir puerto USB" }));
+    await waitFor(() => expect(screen.getByText("Robot conectado")).toBeTruthy());
+    expect(screen.getByText(/USB conectado/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Enviar al robot" }));
+    await waitFor(() => expect(device.frames.some((frame) => /^RUN [\w-]+ A\n$/.test(frame))).toBe(true));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Robot OK" }));
+    expect(device.port.close).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Parar robot" }));
+    await waitFor(() => expect(device.frames.filter((frame) => frame === "STOP\n")).toHaveLength(2));
+    view.unmount();
+    await waitFor(() => expect(device.port.close).toHaveBeenCalledOnce());
   });
 });

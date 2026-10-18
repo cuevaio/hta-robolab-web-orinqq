@@ -12,7 +12,7 @@ export interface SerialPortLike {
   close(): Promise<void>;
 }
 export interface SerialApi {
-  requestPort(options: { filters: { bluetoothServiceClassId: number }[] }): Promise<SerialPortLike>;
+  requestPort(options: { filters: ({ bluetoothServiceClassId: number } | { usbVendorId: number })[] }): Promise<SerialPortLike>;
 }
 export type BluetoothDiagnostic = {
   readonly stage: "select" | "open" | "handshake";
@@ -38,6 +38,10 @@ type Options = {
   uuid?: () => string;
   handshakeMs?: number;
   leaseMs?: number;
+  portFilters?: Parameters<SerialApi["requestPort"]>[0]["filters"];
+  helloFrame?: string;
+  helloRetryMs?: number;
+  handshakeFailureMessage?: string;
   unsupportedMessage?: string;
   openFailureMessage?: string;
 };
@@ -66,6 +70,10 @@ export function createBluetoothLink({
   uuid = () => crypto.randomUUID(),
   handshakeMs = 4500,
   leaseMs = BLUETOOTH_LEASE_MS,
+  portFilters = [{ bluetoothServiceClassId: 0x1101 }],
+  helloFrame = "HELLO\n",
+  helloRetryMs = 0,
+  handshakeFailureMessage = "El robot no respondió. Carga el firmware Bluetooth de RoboLab y vuelve a elegirlo.",
   unsupportedMessage = "Bluetooth Classic necesita Chrome o Edge en computadora con HTTPS o localhost.",
   openFailureMessage = "No pudimos abrir Bluetooth. Comprueba que RoboLab esté encendido y cerca. Cierra su conexión en otras pestañas o navegadores. Si continúa, apaga y enciende el robot y revisa su emparejamiento.",
 }: Options = {}) {
@@ -86,6 +94,7 @@ export function createBluetoothLink({
   let heartbeat: ReturnType<typeof setInterval> | undefined;
   let deadline: ReturnType<typeof setTimeout> | undefined;
   let helloTimer: ReturnType<typeof setTimeout> | undefined;
+  let helloRetryTimer: ReturnType<typeof setInterval> | undefined;
   let helloResolve: (() => void) | undefined;
   let helloReject: ((error: Error) => void) | undefined;
   let lastPing = 0;
@@ -98,7 +107,7 @@ export function createBluetoothLink({
 
   function shutdown(error: string | null, sendStop = true, diagnostic: BluetoothDiagnostic | null = null) {
     ++generation;
-    clearInterval(heartbeat); clearTimeout(deadline); clearTimeout(helloTimer);
+    clearInterval(heartbeat); clearInterval(helloRetryTimer); clearTimeout(deadline); clearTimeout(helloTimer);
     helloReject?.(new Error(error ?? "Conexión cancelada."));
     helloResolve = undefined; helloReject = undefined;
     const currentPort = port, currentReader = reader, currentWriter = writer, currentReading = reading, currentOpening = opening;
@@ -144,6 +153,7 @@ export function createBluetoothLink({
     const message = parseBluetoothLine(line);
     if (!message) return;
     if (message.kind === "hello" && snapshot.state === "searching") {
+      clearInterval(helloRetryTimer);
       lastPing = Date.now();
       update({ commands: message.commands, turns: message.turns });
       helloResolve?.();
@@ -204,7 +214,7 @@ export function createBluetoothLink({
       let stage: BluetoothDiagnostic["stage"] = "select";
       try {
         // El selector se abre dentro del gesto del usuario, antes de cualquier otra espera.
-        selected = await serial!.requestPort({ filters: [{ bluetoothServiceClassId: 0x1101 }] });
+        selected = await serial!.requestPort({ filters: portFilters });
         if (current !== generation) return;
         stage = "open";
         const previousScreenClosing = serialClosures.get(serial!);
@@ -221,11 +231,23 @@ export function createBluetoothLink({
         reader = port.readable.getReader(); writer = port.writable.getWriter();
         const hello = new Promise<void>((resolve, reject) => {
           helloResolve = resolve; helloReject = reject;
-          helloTimer = setTimeout(() => reject(new Error("El robot no respondió. Carga el firmware Bluetooth de RoboLab y vuelve a elegirlo.")), handshakeMs);
+          helloTimer = setTimeout(() => reject(new Error(handshakeFailureMessage)), handshakeMs);
         });
         reading = readLoop(reader, current);
-        await Promise.all([hello, write("HELLO\n")]);
-        clearTimeout(helloTimer); helloResolve = undefined; helloReject = undefined;
+        let helloWriting = false;
+        const sendHello = async () => {
+          if (helloWriting || current !== generation) return;
+          helloWriting = true;
+          try { await write(helloFrame); }
+          catch (error) {
+            if (current === generation) helloReject?.(error instanceof Error ? error : new Error("No pudimos enviar el saludo al robot."));
+          }
+          finally { helloWriting = false; }
+        };
+        const firstHello = sendHello();
+        if (helloRetryMs > 0) helloRetryTimer = setInterval(() => { void sendHello(); }, helloRetryMs);
+        await Promise.all([hello, firstHello]);
+        clearInterval(helloRetryTimer); clearTimeout(helloTimer); helloResolve = undefined; helloReject = undefined;
         if (current !== generation) return;
         update({ state: "on" });
         heartbeat = setInterval(() => {
