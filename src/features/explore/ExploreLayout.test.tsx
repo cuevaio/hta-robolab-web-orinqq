@@ -88,3 +88,26 @@ describe("cabecera del modo abierto en pantalla ancha", () => {
     expect(document.title).toBe("RoboLab");
   });
 });
+
+describe("botón de sonido", () => {
+  beforeEach(() => {
+    pretendViewport(false);
+    localStorage.clear();
+  });
+
+  it("está en la cabecera, con ícono y palabra; apagarlo y encenderlo se recuerda", async () => {
+    vi.resetModules();
+    const { ExploreLayout: Layout } = await import("./ExploreLayout");
+    const { setMuted } = await import("../../shared/sound/sounds");
+    setMuted(false);
+    renderAt("/", <Layout>contenido</Layout>);
+    const button = screen.getByRole("button", { name: /Sonido/ });
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(button);
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    expect(localStorage.getItem("robolab.sonido")).toBe("off");
+    fireEvent.click(button);
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    expect(localStorage.getItem("robolab.sonido")).toBe("on");
+  });
+});

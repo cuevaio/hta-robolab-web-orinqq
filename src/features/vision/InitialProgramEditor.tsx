@@ -1,5 +1,6 @@
 import { type ComponentProps, type ReactNode, useState } from "react";
 import { createPortal } from "react-dom";
+import { playSound } from "../../shared/sound/sounds";
 import { MAX_BLOCKS, type Command, countBlocks } from "@robolab/backend/domain/game/program";
 import { type BlockEditor, ProgramHead, PieceTray, Sequence } from "../game/BlockEditor";
 import type { GestureHints } from "../game/BlockEditor";
@@ -49,7 +50,10 @@ export function InitialProgramEditor({ onExecute, headerActions, actions, camera
       disabled={editor.disabled}
       canConfirm={editor.state.blocks.length > 0}
       full={countBlocks(editor.state.blocks) >= MAX_BLOCKS}
-      onCommand={(command) => editor.dispatch({ type: "add", command })}
+      onCommand={(command) => {
+        editor.dispatch({ type: "add", command });
+        playSound("place");
+      }}
       onConfirm={onExecute}
       onCandidate={setSeen}
       onUnavailable={(reason) => {

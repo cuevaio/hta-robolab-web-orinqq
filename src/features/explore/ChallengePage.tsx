@@ -25,6 +25,7 @@ import { RobotSend } from "../robot/RobotSend";
 import { useRobotLink, type RobotSync } from "../robot/useRobotLink";
 import { STEP_MS, useRunner } from "../game/useRunner";
 import { useStudentToken } from "../student/session";
+import { playSound, shouldStepSound } from "../../shared/sound/sounds";
 import { speak } from "../student/speech";
 import { ChallengeDone } from "./ChallengeDone";
 import { Breadcrumbs, ExploreLayout, LEVEL_INFO } from "./ExploreLayout";
@@ -145,26 +146,36 @@ function Play({ challenge, robot, onSolved }: { challenge: Challenge; robot: Rob
     window.setTimeout(() => onSolved({ runs: Math.max(runs, 1), hints, ms: Date.now() - startedAt }, submission), 1200);
   };
 
-  const { state: runner, run, reset } = useRunner(challenge.map, () => {
-    if (challenge.kind === "predict") {
-      setBoardMood("success");
-      finish({ pick: picked ?? challenge.map.start });
-      return;
-    }
-    const { result } = checkProgram(challenge, ranProgram.current);
-    if (result.ok) {
-      setBoardMood("success");
-      say("happy", result.message);
-      finish({ program: ranProgram.current });
-    } else {
-      setBoardMood(result.reason === "OFF_PATH" ? "error" : "idle");
-      say(MOOD_FOR[result.reason], result.message);
-    }
-  });
+  const { state: runner, run, reset } = useRunner(
+    challenge.map,
+    () => {
+      if (challenge.kind === "predict") {
+        setBoardMood("success");
+        playSound("win");
+        finish({ pick: picked ?? challenge.map.start });
+        return;
+      }
+      const { result } = checkProgram(challenge, ranProgram.current);
+      if (result.ok) {
+        setBoardMood("success");
+        playSound("win");
+        say("happy", result.message);
+        finish({ program: ranProgram.current });
+      } else {
+        setBoardMood(result.reason === "OFF_PATH" ? "error" : "idle");
+        playSound("oops");
+        say(MOOD_FOR[result.reason], result.message);
+      }
+    },
+    (index, total) => {
+      if (shouldStepSound(index, total)) playSound("step");
+    },
+  );
 
   function execute() {
     if (runner.running || solved || robot.busy || editor.blocks.length === 0) return;
     ranProgram.current = editor.blocks;
+    playSound("play");
     setRuns((n) => n + 1);
     setBoardMood("idle");
     setGuide({ mood: "thinking", message: "Mira cómo se mueve Robi…" });
@@ -181,6 +192,7 @@ function Play({ challenge, robot, onSolved }: { challenge: Challenge; robot: Rob
       say("happy", `${result.message} Mira cómo llega.`);
       run(challenge.given);
     } else {
+      playSound("oops");
       say(MOOD_FOR[result.reason], runs >= 1 && hints === 0 ? `${result.message} Puedes pedirme una pista.` : result.message);
     }
   }

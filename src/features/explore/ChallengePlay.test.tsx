@@ -15,6 +15,15 @@ vi.mock("convex/react", () => ({
 const voice = vi.hoisted(() => ({ speak: vi.fn() }));
 vi.mock("../student/speech", () => ({ speak: voice.speak, stopSpeaking: vi.fn(), canSpeak: () => true }));
 
+const sound = vi.hoisted(() => ({ playSound: vi.fn() }));
+vi.mock("../../shared/sound/sounds", () => ({
+  playSound: sound.playSound,
+  shouldStepSound: () => true,
+  isMuted: () => false,
+  setMuted: vi.fn(),
+  subscribeMuted: () => () => undefined,
+}));
+
 import { ChallengeRoute } from "./ChallengePage";
 
 const NOW = Date.UTC(2026, 9, 17, 20, 0);
@@ -40,6 +49,8 @@ beforeEach(() => {
   window.localStorage.clear();
   status.mockReset();
   mutation.mockClear();
+  sound.playSound.mockClear();
+  voice.speak.mockClear();
   // jsdom no hace scroll: se vigila que cada fase nueva pida empezar arriba.
   window.scrollTo = scrollTo as unknown as typeof window.scrollTo;
   scrollTo.mockClear();
@@ -156,5 +167,41 @@ describe("pantalla del reto: al lograrlo", () => {
     const title = screen.getByRole("heading", { level: 1 });
     expect(title.textContent).toBe("Primer paseo.");
     expect(document.activeElement).toBe(title);
+  });
+});
+
+describe("sonidos del reto, sin voces que repitan las acciones", () => {
+  const start = () => {
+    renderChallenge();
+    fireEvent.click(screen.getByRole("button", { name: /Empezar el reto/ }));
+    voice.speak.mockClear();
+    sound.playSound.mockClear();
+  };
+  const tap = (name: string) => fireEvent.click(within(screen.getByRole("group", { name: "Piezas" })).getByRole("button", { name }));
+  const names = () => sound.playSound.mock.calls.map((c) => c[0]);
+
+  it("tocar una pieza hace «plop» y no dice «Avanzar» ni «Arriba» en voz alta", () => {
+    start();
+    tap("Avanzar");
+    expect(names()).toEqual(["place"]);
+    expect(voice.speak).not.toHaveBeenCalled();
+  });
+
+  it("Ejecutar suena «bip-bip», cada paso su «tup» y al llegar la melodía", () => {
+    start();
+    for (let i = 0; i < 3; i++) tap("Avanzar");
+    sound.playSound.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: /Ejecutar/ }));
+    act(() => void vi.advanceTimersByTime(3000));
+    expect(names()).toEqual(["play", "step", "step", "step", "win"]);
+  });
+
+  it("si el programa no llega, suena el «boop» amable y no la melodía", () => {
+    start();
+    tap("Avanzar");
+    sound.playSound.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: /Ejecutar/ }));
+    act(() => void vi.advanceTimersByTime(3000));
+    expect(names()).toEqual(["play", "step", "oops"]);
   });
 });

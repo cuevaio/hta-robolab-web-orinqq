@@ -16,6 +16,8 @@ const session = vi.hoisted(() => ({
   cameraOnly: false,
 }));
 const voice = vi.hoisted(() => ({ speak: vi.fn() }));
+const sound = vi.hoisted(() => ({ playSound: vi.fn() }));
+vi.mock("../../shared/sound/sounds", () => ({ playSound: sound.playSound, shouldStepSound: () => true }));
 vi.mock("../student/speech", () => ({ speak: voice.speak, stopSpeaking: vi.fn(), canSpeak: () => true }));
 vi.mock("./cameraSession", () => ({
   startCameraSession: (_video: HTMLVideoElement, callbacks: { onSample: typeof session.onSample; onCamera?: () => void; onReady: () => void; onError: (message: string) => void }) => {
@@ -203,7 +205,7 @@ describe("programar Inicial: Gestos por defecto, Botones como alternativa", () =
     expect(document.getElementById(describedBy)?.textContent).toMatch(/recoge los otros dedos/);
   });
 
-  it("en Gestos los comandos no se dicen en voz alta: ni los que pide la mano ni las manos que se tocan", () => {
+  it("ningún comando se dice en voz alta (ni «Arriba» ni «Avanzar»): ni por gesto ni tocando, en Gestos o en Botones", () => {
     render(<Harness />);
     release(0);
     sample("Pointing_Up", 500);
@@ -212,11 +214,21 @@ describe("programar Inicial: Gestos por defecto, Botones como alternativa", () =
     expect(voice.speak).not.toHaveBeenCalled();
   });
 
-  it("en Botones tocar una pieza la sigue diciendo en voz alta", () => {
+  it("en Botones tampoco: tocar una pieza solo hace sonar el «plop»", () => {
     render(<Harness />);
     choose("Botones");
     fireEvent.click(screen.getByRole("button", { name: "Avanzar" }));
-    expect(voice.speak).toHaveBeenCalledWith("Avanzar");
+    expect(voice.speak).not.toHaveBeenCalled();
+    expect(sound.playSound).toHaveBeenCalledWith("place");
+  });
+
+  it("una pieza que agrega la mano suena igual que una tocada, y quitarla suena distinto", () => {
+    render(<Harness />);
+    release(0);
+    sample("Pointing_Up", 500);
+    expect(sound.playSound).toHaveBeenCalledWith("place");
+    fireEvent.click(screen.getByRole("button", { name: /Paso 1: Avanzar/ }));
+    expect(sound.playSound).toHaveBeenLastCalledWith("remove");
   });
 
   it("al elegir Gestos la imagen de la cámara se ve apenas hay permiso, mientras se preparan los gestos", () => {

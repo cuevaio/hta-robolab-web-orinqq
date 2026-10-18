@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import type { Topic } from "@robolab/backend/domain/explore/challenges";
 import type { EducationLevel } from "@robolab/backend/domain/game/levels";
 import { APP_NAME } from "../../shared/brand";
+import { SoundToggle } from "../../shared/sound/SoundToggle";
 import { Icon } from "../../shared/ui/Icon";
 import { MOBILE_QUERY, useMediaQuery } from "../../shared/useMediaQuery";
 import { usePageTitle } from "../../shared/usePageTitle";
@@ -83,6 +84,7 @@ export function ExploreLayout({ children, title, backTo }: Props) {
             </Link>
           )}
           {!mobile && sections}
+          <SoundToggle />
           {!mobile && (
             <Link className="btn btn-sm" to="/docente">
               Soy docente

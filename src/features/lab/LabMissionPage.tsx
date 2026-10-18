@@ -11,11 +11,11 @@ import { useDocumentTitle } from "./useDocumentTitle";
 export function LabMissionPage() {
   const { id = "" } = useParams();
   const data = useQuery(api.lab.get, { id });
-  useDocumentTitle(data?.title ?? "Laboratorio multigrado");
+  useDocumentTitle(data?.title ?? "Laboratorio de misiones");
 
   return (
     <ExploreLayout>
-      <Breadcrumbs items={[{ label: "Explorar", to: "/" }, { label: "Laboratorio multigrado", to: "/laboratorio" }, { label: data?.title ?? "Misión" }]} />
+      <Breadcrumbs items={[{ label: "Explorar", to: "/" }, { label: "Laboratorio de misiones", to: "/laboratorio" }, { label: data?.title ?? "Misión" }]} />
       {data === undefined ? (
         <p className="muted">Cargando…</p>
       ) : data === null ? (

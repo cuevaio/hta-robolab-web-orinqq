@@ -2048,6 +2048,20 @@ textarea.input {
     order: 3;
     flex-basis: 100%;
   }
+
+  /* En el celular el botón de sonido va junto al menú y solo con su ícono (la palabra queda para el lector de pantalla). */
+  .sound-toggle {
+    margin-left: auto;
+  }
+
+  .sound-toggle-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 .hero-title {

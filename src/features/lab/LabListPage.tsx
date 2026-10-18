@@ -13,13 +13,13 @@ export const themeLabel = (theme: string): string => (isTheme(theme) ? THEME_INF
 /** /laboratorio: vitrina de las misiones publicadas por docentes y la entrada al creador. */
 export function LabListPage() {
   const missions = useQuery(api.lab.listPublic);
-  useDocumentTitle("Laboratorio multigrado");
+  useDocumentTitle("Laboratorio de misiones");
 
   return (
     <ExploreLayout>
       <div className="lab-hero">
         <div>
-          <h1 style={{ margin: 0 }}>Laboratorio multigrado</h1>
+          <h1 style={{ margin: 0 }}>Laboratorio de misiones</h1>
           <p className="muted">
             Misiones creadas por docentes: un tablero de 6 × 6, tres niveles (2.º, 3.º y 4.º) y un solo robot para toda el aula.
           </p>
