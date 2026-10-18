@@ -30,7 +30,7 @@ const CHIP: Record<SyncState, string> = { off: "Robot sin conectar", searching: 
 const BUTTON: Record<SyncState, string> = { off: "Robot", searching: "Buscando…", on: "Robot OK" };
 
 const WIFI_STEPS = ["Enciende el robot", "Mira su código en la pantalla o en el monitor", "Escríbelo aquí"];
-const BLUETOOTH_STEPS = ["Enciende el robot", "Empareja RoboLab una vez en los ajustes Bluetooth de tu computadora", "Vuelve aquí: toca «Elegir robot» y selecciona RoboLab"];
+const BLUETOOTH_STEPS = ["Enciende el robot", "Activa Bluetooth en tu equipo", "Toca «Elegir robot» y selecciona RoboLab"];
 
 /** `showModal` atrapa el foco y bloquea el fondo; donde no existe (navegadores viejos) se abre sin modal. */
 function openDialog(dialog: HTMLDialogElement) {
@@ -53,7 +53,7 @@ type Props = {
 
 /**
  * Botón "Robot" (sin conectar / Buscando… / Robot OK) que abre la hoja
- * "Sincronizar con robot". Bluetooth Classic SPP es la opción inicial;
+ * "Sincronizar con robot". Bluetooth BLE es la opción inicial;
  * wifi conserva el emparejamiento por código para firmware anterior.
  */
 export function RobotSend({ robot, program, disabled }: Props) {
@@ -125,21 +125,24 @@ export function RobotSend({ robot, program, disabled }: Props) {
 }
 
 const BLUETOOTH_STEP = { sending: "Enviando programa…", received: "El robot recibió el programa.", running: "El robot lo está haciendo…", done: "¡El robot terminó!", failed: "El programa se detuvo." };
-const CONNECTION_STAGE = { select: "Al elegir el robot", open: "Al abrir el puerto", handshake: "Al confirmar la conexión" };
+const CONNECTION_STAGE = { select: "Al elegir el robot", open: "Al conectar con el robot", handshake: "Al confirmar la conexión" };
 
 function BluetoothBody({ robot, program, disabled, onDone }: Props & { onDone: () => void }) {
   const problem = robot.programProblem(program);
   const last = robot.bluetooth.last;
   const diagnostic = robot.bluetooth.diagnostic;
   return <div className="stack">
-    {!robot.supported && <p className="hint">Bluetooth Classic necesita Chrome o Edge en computadora con HTTPS o localhost. También puedes conectar por Wifi.</p>}
+    {!robot.supported && <>
+      <p className="hint">Usa Chrome con Web Bluetooth habilitado y HTTPS o localhost. También puedes conectar por Wifi.</p>
+      <p className="hint">En Ubuntu, activa «Experimental Web Platform features» en chrome://flags y reinicia Chrome.</p>
+    </>}
     {robot.state !== "on" ? <div className="row sheet-actions">
       <button className="btn" type="button" onClick={() => { void robot.disconnect(); onDone(); }}>Cancelar</button>
       <button className="btn btn-primary" type="button" disabled={!robot.supported || robot.state === "searching"} onClick={() => void robot.connect()}>
         {robot.state === "searching" ? "Conectando…" : "Elegir robot"}
       </button>
     </div> : <>
-      <p className="small muted">Bluetooth Classic conectado. {robot.bluetooth.turns === "arc" ? "Este robot hace giros en arco; calibra el recorrido físico." : "El robot gira sobre su centro."}</p>
+      <p className="small muted">Bluetooth BLE conectado. {robot.bluetooth.turns === "arc" ? "Este robot hace giros en arco; calibra el recorrido físico." : "El robot gira sobre su centro."}</p>
       {problem && <p className="hint" role="status">{problem}</p>}
       {last && <p className="small muted" role="status"><span className="code">{last.letters}</span> · {BLUETOOTH_STEP[last.status]}</p>}
       <div className="row sheet-actions">

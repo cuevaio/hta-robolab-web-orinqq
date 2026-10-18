@@ -4,26 +4,21 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../shared/ui/Toast";
 import { ChallengeRoute } from "./ChallengePage";
+import { bleTestDevice } from "../robot/bleTestDevice";
 
 vi.mock("convex/react", () => ({ useQuery: () => undefined, useMutation: () => async () => ({ solved: true }) }));
-afterEach(() => { cleanup(); vi.useRealTimers(); localStorage.clear(); Reflect.deleteProperty(navigator, "serial"); });
+afterEach(() => { cleanup(); vi.useRealTimers(); localStorage.clear(); Reflect.deleteProperty(navigator, "bluetooth"); });
 
 it("Ejecutar envía una vez por Bluetooth y el resultado en pantalla conserva el enlace mientras el robot termina", async () => {
-  let receive!: ReadableStreamDefaultController<Uint8Array>;
-  const written: string[] = [];
-  const respond = (text: string) => receive.enqueue(new TextEncoder().encode(text));
-  const close = vi.fn(async () => {});
-  const port = {
-    readable: new ReadableStream<Uint8Array>({ start(controller) { receive = controller; } }),
-    writable: new WritableStream<Uint8Array>({ write(data) {
-      const text = new TextDecoder().decode(data); written.push(text);
-      if (text === "HELLO\n") respond("ROBO/1 ADZ ARC\n");
-      if (text === "PING\n") respond("PONG\n");
+  const peripheral = bleTestDevice({
+    onFrame(text, respond) {
       const run = /^RUN ([\w-]+) AAAA\n$/.exec(text);
       if (run) respond(`STATUS ${run[1]} OK\nSTATUS ${run[1]} RUN\n`);
-    } }), open: async () => {}, close,
-  };
-  Object.defineProperty(navigator, "serial", { configurable: true, value: { requestPort: async () => port } });
+    },
+  });
+  const written = peripheral.frames;
+  const close = peripheral.gatt.disconnect;
+  Object.defineProperty(navigator, "bluetooth", { configurable: true, value: peripheral.bluetooth });
   const view = render(<ToastProvider><MemoryRouter initialEntries={["/reto/inicial-paseo"]}><Routes><Route path="/reto/:id" element={<ChallengeRoute />} /></Routes></MemoryRouter></ToastProvider>);
   fireEvent.click(screen.getByRole("button", { name: "Empezar el reto" }));
   fireEvent.click(screen.getByRole("button", { name: /Sincronizar con robot/ }));
@@ -39,7 +34,7 @@ it("Ejecutar envía una vez por Bluetooth y el resultado en pantalla conserva el
   expect(close).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: "Parar robot" })).toBeTruthy();
   const id = written.find((text) => text.startsWith("RUN"))!.split(" ")[1];
-  await act(async () => { respond(`STATUS ${id} DONE\n`); });
+  await act(async () => { peripheral.tx.notify(`STATUS ${id} DONE\n`); });
   expect(screen.queryByRole("button", { name: "Parar robot" })).toBeNull();
   view.unmount();
   vi.useRealTimers();

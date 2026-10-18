@@ -8,6 +8,7 @@ export interface SerialPortLike {
   readonly readable: ReadableStream<Uint8Array> | null;
   readonly writable: WritableStream<Uint8Array> | null;
   open(options: { baudRate: number }): Promise<void>;
+  cancelOpen?(): void;
   close(): Promise<void>;
 }
 export interface SerialApi {
@@ -32,11 +33,13 @@ export type BluetoothSnapshot = {
   readonly last: { readonly id: string; readonly letters: string; readonly status: "sending" | "received" | "running" | "done" | "failed"; readonly error?: string } | null;
 };
 type Options = {
-  serial?: SerialApi;
+  serial?: SerialApi | null;
   secure?: boolean;
   uuid?: () => string;
   handshakeMs?: number;
   leaseMs?: number;
+  unsupportedMessage?: string;
+  openFailureMessage?: string;
 };
 
 export const BLUETOOTH_ERRORS: Record<string, string> = {
@@ -56,13 +59,15 @@ export const BLUETOOTH_ERRORS: Record<string, string> = {
   NETWORK: "Se perdió la conexión. Vuelve a elegir el robot.",
 };
 
-/** Classic SPP usa Web Serial, no navigator.bluetooth (BLE). Nunca reintenta RUN. */
+/** Sesión del protocolo sobre streams; admite Web Serial o el adaptador BLE. Nunca reintenta RUN. */
 export function createBluetoothLink({
   serial = typeof navigator === "undefined" ? undefined : (navigator as Navigator & { serial?: SerialApi }).serial,
   secure = globalThis.isSecureContext !== false,
   uuid = () => crypto.randomUUID(),
   handshakeMs = 4500,
   leaseMs = BLUETOOTH_LEASE_MS,
+  unsupportedMessage = "Bluetooth Classic necesita Chrome o Edge en computadora con HTTPS o localhost.",
+  openFailureMessage = "No pudimos abrir Bluetooth. Comprueba que RoboLab esté encendido y cerca. Cierra su conexión en otras pestañas o navegadores. Si continúa, apaga y enciende el robot y revisa su emparejamiento.",
 }: Options = {}) {
   const supported = !!serial && secure;
   let snapshot: BluetoothSnapshot = { state: "off", busy: false, error: null, diagnostic: null, commands: null, turns: null, last: null };
@@ -98,6 +103,8 @@ export function createBluetoothLink({
     helloResolve = undefined; helloReject = undefined;
     const currentPort = port, currentReader = reader, currentWriter = writer, currentReading = reading, currentOpening = opening;
     port = null; reader = null; writer = null; reading = null; opening = null;
+    // BLE permite abortar GATT sin esperar el timeout del descubrimiento.
+    if (currentOpening) currentPort?.cancelOpen?.();
     update({ state: "off", busy: false, error, diagnostic, commands: null, turns: null,
       ...(snapshot.busy && snapshot.last ? { last: { ...snapshot.last, status: "failed", error: error ? "DISCONNECTED" : "STOPPED" } } : {}),
     });
@@ -190,7 +197,7 @@ export function createBluetoothLink({
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     async connect() {
       if (snapshot.state !== "off") return;
-      if (!supported) { update({ error: "Bluetooth Classic necesita Chrome o Edge en computadora con HTTPS o localhost." }); return; }
+      if (!supported) { update({ error: unsupportedMessage }); return; }
       const current = ++generation;
       update({ state: "searching", error: null, diagnostic: null, last: null });
       let selected: SerialPortLike | undefined;
@@ -235,7 +242,7 @@ export function createBluetoothLink({
           : stage === "open" && error instanceof DOMException
             ? error.name === "InvalidStateError"
               ? "El puerto del robot sigue ocupado. Desconéctalo en las otras pestañas o navegadores y vuelve a elegirlo."
-              : "No pudimos abrir Bluetooth. Comprueba que RoboLab esté encendido y cerca. Cierra su conexión en otras pestañas o navegadores. Si continúa, apaga y enciende el robot y revisa su emparejamiento."
+              : openFailureMessage
             : failure ? failure.message : "No pudimos abrir Bluetooth. Revisa el emparejamiento y los permisos.";
         const diagnostic = cancelled ? null : {
           stage, name: failure?.name ?? "Error",

@@ -13,6 +13,7 @@ vi.mock("convex/react", () => ({
 
 import { RobotSend } from "./RobotSend";
 import { useRobotLink } from "./useRobotLink";
+import { bleTestDevice } from "./bleTestDevice";
 
 const NOW = Date.UTC(2026, 9, 17, 20, 0);
 const ROBOT_KEY = "robolab.robot";
@@ -41,6 +42,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   Reflect.deleteProperty(navigator, "serial");
+  Reflect.deleteProperty(navigator, "bluetooth");
   vi.useRealTimers();
 });
 
@@ -99,77 +101,68 @@ describe("sincronizar con robot (wifi)", () => {
   });
 });
 
-describe("sincronizar con robot (Bluetooth Classic)", () => {
+describe("sincronizar con robot (BLE)", () => {
   it("cerrar la hoja durante el selector cancela la conexión pendiente", async () => {
-    let choose!: (port: { readable: null; writable: null; open: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }) => void;
-    const port = { readable: null, writable: null, open: vi.fn(async () => {}), close: vi.fn(async () => {}) };
-    Object.defineProperty(navigator, "serial", { configurable: true, value: { requestPort: () => new Promise((resolve) => { choose = resolve; }) } });
+    const peripheral = bleTestDevice();
+    let choose!: (device: typeof peripheral.device) => void;
+    Object.defineProperty(navigator, "bluetooth", { configurable: true, value: { requestDevice: () => new Promise((resolve) => { choose = resolve; }) } });
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: /Sincronizar con robot/ }));
     fireEvent.click(screen.getByRole("button", { name: "Elegir robot" }));
     fireEvent(screen.getByRole("dialog"), new Event("close"));
-    choose(port);
+    choose(peripheral.device);
     await waitFor(() => expect(screen.getByRole("button", { name: /Sincronizar con robot/ }).textContent).toBe("Robot"));
-    expect(port.open).not.toHaveBeenCalled();
+    expect(peripheral.gatt.connect).not.toHaveBeenCalled();
   });
 
-  it("ofrece Bluetooth como opción inicial y explica compatibilidad sin pedir código wifi", () => {
+  it("explica Chrome y Ubuntu sin pedir emparejar en el sistema ni código wifi", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: /Sincronizar con robot/ }));
     const sheet = within(screen.getByRole("dialog"));
     expect(sheet.getByRole("button", { name: "Bluetooth" }).getAttribute("aria-pressed")).toBe("true");
     expect(sheet.queryByLabelText("Código del robot")).toBeNull();
-    expect(sheet.getByText(/Chrome o Edge.*computadora/)).toBeTruthy();
+    expect(sheet.getByText(/Chrome.*Web Bluetooth/)).toBeTruthy();
+    expect(sheet.getByText(/Ubuntu.*Experimental Web Platform features/)).toBeTruthy();
+    expect(sheet.queryByText(/Empareja RoboLab/)).toBeNull();
     expect((sheet.getByRole("button", { name: "Elegir robot" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(sheet.getByRole("button", { name: "Wifi" }));
     expect(sheet.getByLabelText("Código del robot")).toBeTruthy();
   });
 
-  it("explica cómo recuperar Bluetooth y conserva el error original para diagnosticarlo", async () => {
-    const port = {
-      readable: null, writable: null,
-      open: async () => { throw new DOMException("Failed to open serial port.", "NetworkError"); },
-      close: async () => {},
-    };
-    Object.defineProperty(navigator, "serial", { configurable: true, value: { requestPort: async () => port } });
+  it("un fallo GATT conserva el error original y permite volver a elegir el robot", async () => {
+    const peripheral = bleTestDevice();
+    peripheral.gatt.connect.mockRejectedValueOnce(new DOMException("GATT connection failed", "NetworkError"));
+    Object.defineProperty(navigator, "bluetooth", { configurable: true, value: peripheral.bluetooth });
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: /Sincronizar con robot/ }));
     fireEvent.click(screen.getByRole("button", { name: "Elegir robot" }));
     const sheet = within(screen.getByRole("dialog"));
     await waitFor(() => expect(sheet.getByRole("alert").textContent).toMatch(/encendido y cerca/));
     expect(sheet.getByText("Detalles de conexión")).toBeTruthy();
-    expect(sheet.getByText(/Al abrir el puerto.*NetworkError/)).toBeTruthy();
-    expect(sheet.getByText("Failed to open serial port.")).toBeTruthy();
-    expect((sheet.getByRole("button", { name: "Elegir robot" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(sheet.getByText(/Al conectar con el robot.*NetworkError/)).toBeTruthy();
+    expect(sheet.getByText("GATT connection failed")).toBeTruthy();
+    fireEvent.click(sheet.getByRole("button", { name: "Elegir robot" }));
+    await waitFor(() => expect(sheet.getByText("Robot conectado")).toBeTruthy());
   });
 
   it("mantiene el enlace al cerrar la hoja, muestra capacidades reales y permite parar fuera de ella", async () => {
-    let input!: ReadableStreamDefaultController<Uint8Array>;
-    const written: string[] = [];
-    const port = {
-      readable: new ReadableStream<Uint8Array>({ start(controller) { input = controller; } }),
-      writable: new WritableStream<Uint8Array>({ write(data) {
-        const text = new TextDecoder().decode(data); written.push(text);
-        if (text === "HELLO\n") input.enqueue(new TextEncoder().encode("ROBO/1 ADZ ARC\n"));
-      } }),
-      open: async () => {}, close: vi.fn(async () => {}),
-    };
-    Object.defineProperty(navigator, "serial", { configurable: true, value: { requestPort: async () => port } });
+    const peripheral = bleTestDevice();
+    Object.defineProperty(navigator, "bluetooth", { configurable: true, value: peripheral.bluetooth });
     const { rerender, unmount } = render(<Harness program={[move("BACKWARD")]} />);
     fireEvent.click(screen.getByRole("button", { name: /Sincronizar con robot/ }));
     fireEvent.click(screen.getByRole("button", { name: "Elegir robot" }));
     await waitFor(() => expect(within(screen.getByRole("dialog")).getByText("Robot conectado")).toBeTruthy());
-    expect(screen.getByText(/giros en arco/i)).toBeTruthy();
+    expect(screen.getByText(/BLE conectado/)).toBeTruthy();
     expect(screen.getByText(/Quita los pasos de retroceso/)).toBeTruthy();
     expect((screen.getByRole("button", { name: "Enviar al robot" }) as HTMLButtonElement).disabled).toBe(true);
     rerender(<Harness program={[move("FORWARD")]} />);
     fireEvent.click(screen.getByRole("button", { name: "Enviar al robot" }));
-    await waitFor(() => expect(written.some((text) => /^RUN [\w-]+ A\n$/.test(text))).toBe(true));
+    await waitFor(() => expect(peripheral.frames.some((text) => /^RUN [\w-]+ A\n$/.test(text))).toBe(true));
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Robot OK" }));
-    expect(port.close).not.toHaveBeenCalled();
+    expect(peripheral.gatt.connected).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Parar robot" }));
-    await waitFor(() => expect(written).toContain("STOP\n"));
+    await waitFor(() => expect(peripheral.frames).toContain("STOP\n"));
     unmount();
-    await waitFor(() => expect(port.close).toHaveBeenCalledOnce());
+    await waitFor(() => expect(peripheral.gatt.connected).toBe(false));
   });
 });

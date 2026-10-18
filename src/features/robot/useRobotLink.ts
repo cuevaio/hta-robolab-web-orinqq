@@ -4,7 +4,7 @@ import { toRobotText } from "@robolab/backend/domain/robot/protocol";
 import { bluetoothProgramProblem } from "@robolab/backend/domain/robot/bluetooth";
 import { userMessage } from "../../shared/errors";
 import { useToast } from "../../shared/ui/Toast";
-import { createBluetoothLink } from "./bluetoothLink";
+import { createBleLink } from "./bleLink";
 import { useWifiRobotLink } from "./useWifiRobotLink";
 
 export type { SyncState } from "./useWifiRobotLink";
@@ -19,7 +19,7 @@ function savedTransport(): RobotTransport {
 /** La ejecución del reto y la hoja Robot comparten una única conexión física. */
 export function useRobotLink() {
   const [transport, selectTransport] = useState(savedTransport);
-  const [bluetooth] = useState(() => createBluetoothLink());
+  const [bluetooth] = useState(() => createBleLink());
   const connection = useSyncExternalStore(bluetooth.subscribe, bluetooth.getSnapshot);
   const wifi = useWifiRobotLink(transport === "wifi");
   const [localError, setLocalError] = useState<string | null>(null);

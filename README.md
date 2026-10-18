@@ -219,18 +219,21 @@ git commit -m "Backend al día"
 Si TypeScript marca una función o un tipo que ya no existe, el backend cambió
 su contrato: ajustar la web en ese mismo cambio.
 
-## Robot por Bluetooth Classic
+## Robot por Bluetooth BLE
 
-La hoja **Robot → Bluetooth** conecta directamente con el ESP32 clásico usando
-Web Serial. Convex mantiene las clases y los resultados; el robot no necesita
+La hoja **Robot → Bluetooth** conecta directamente con el ESP32 usando
+Web Bluetooth (BLE). Convex mantiene las clases y los resultados; el robot no necesita
 wifi para recibir los movimientos. El modo **Wifi** conserva la conexión por código.
 
-1. Cargar el sketch completo `firmware/robi/robi.ino` del backend. Incluye los
+1. Cargar el nuevo sketch BLE completo `firmware/robi/robi.ino` del backend. Incluye los
    motores, ojos, luces y sonidos en un solo archivo; no necesita copiar `.h`.
-2. Emparejar **RoboLab** una vez en los ajustes Bluetooth de la computadora.
-   Puede quedar como desconectado en Ubuntu: el puerto se abre desde la web.
-3. Abrir la web por HTTPS o localhost en Chrome o Edge de escritorio actualizado.
-4. En el reto, tocar **Robot → Elegir robot** y seleccionar su puerto Bluetooth.
+   El firmware anterior de Bluetooth Classic no ofrece el servicio BLE requerido.
+2. Activar Bluetooth en el equipo. El robot se elige desde la web; no hay que
+   emparejarlo en los ajustes del sistema.
+3. Abrir la web por HTTPS o localhost en **Chrome** actualizado. En Ubuntu/Linux,
+   habilitar una vez **Experimental Web Platform features** en
+   `chrome://flags/#enable-experimental-web-platform-features` y reiniciar Chrome.
+4. En el reto, tocar **Robot → Elegir robot** y seleccionar **RoboLab**.
    El chip solo cambia a conectado después de que responde el firmware.
 
 **Ejecutar** envía al robot vinculado en los retos de bloques. La hoja permite
@@ -246,21 +249,21 @@ calibración física; el recorrido dibujado no verifica el movimiento real.
 El contrato, pines y pruebas de aceptación están en
 [robot-bluetooth.md del backend](https://github.com/orinqq/robolab-backend/blob/main/docs/robot-bluetooth.md).
 El lockfile fija el commit del backend oficial por `git+https`.
-La API requiere un navegador con Web Serial;
-si no está disponible, se muestra la alternativa Wifi. Firefox y Zen no ofrecen
-esta conexión Bluetooth Classic de forma nativa.
+La API requiere Web Bluetooth; Chrome es el navegador priorizado. Si no está
+disponible, se muestra cómo habilitarlo y la alternativa Wifi. Firefox, Zen y
+Safari no ofrecen esta conexión BLE de forma nativa.
 
-Al volver a conectar, la web espera que termine de cerrarse el puerto anterior,
+Al volver a conectar, la web espera que termine de cerrarse la conexión anterior,
 también al cambiar de reto. Usa el robot en una sola pestaña o navegador a la vez.
 Si falla, **Detalles de conexión** conserva la etapa y el error del navegador.
 Comprueba que RoboLab esté encendido y cerca, desconéctalo de otros equipos y
-reinícialo. En Ubuntu, si tampoco aparece al buscar dispositivos y el sistema
-informa `Host is down` o `br-connection-page-timeout`, hay que recuperar primero
-el enlace Bluetooth del sistema. Las advertencias `Serial blocklist` sobre
-servicios de audio de otros dispositivos no indican un fallo del puerto SPP de RoboLab.
+vuelve a elegirlo. La web obtiene servicios y características nuevos en cada
+conexión y nunca reenvía automáticamente un programa tras un corte. Si RoboLab
+no aparece en el selector, comprueba que tenga cargado el firmware BLE y que no
+esté conectado a otro equipo.
 
-Referencias: [Bluetooth RFCOMM con Web Serial](https://developer.chrome.com/blog/serial-over-bluetooth)
-y [compatibilidad de Web Serial](https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API).
+Referencias: [Web Bluetooth en Chrome](https://developer.chrome.com/docs/capabilities/bluetooth)
+y [estado de implementación por plataforma](https://github.com/whatwg/bluetooth/blob/main/implementation-status.md).
 
 ## Pruebas y calidad
 
