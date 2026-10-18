@@ -35,6 +35,8 @@ export function VisionControls(props: Props) {
   const [status, setStatus] = useState<"off" | "loading" | "camera" | "ready" | "error">("loading");
   const [message, setMessage] = useState(LOADING);
   const [feedback, setFeedback] = useState(idle);
+  /** Cuánto del modelo de gestos ya bajó (null hasta que se sepa); 100 mientras se prepara. */
+  const [progress, setProgress] = useState<number | null>(null);
   const helpId = useId();
   const video = useRef<HTMLVideoElement>(null);
   const gate = useRef(new GestureGate());
@@ -52,8 +54,10 @@ export function VisionControls(props: Props) {
     if (!enabled || !video.current) return;
     gate.current.reset();
     listening.current = false;
+    setProgress(null);
     const stop = startCameraSession(video.current, {
       isPaused: () => latest.current.disabled,
+      onProgress: setProgress,
       onCamera: () => { setStatus((now) => (now === "ready" ? now : "camera")); setMessage(PREPARING); },
       onReady: () => { listening.current = true; setStatus("ready"); setMessage("Retira la mano y luego elige un gesto."); },
       onError: (error) => { listening.current = false; failed.current = true; setStatus("error"); setMessage(error); setEnabled(false); latest.current.onUnavailable?.(error); },
@@ -106,6 +110,7 @@ export function VisionControls(props: Props) {
   const { onCandidate } = props;
   useEffect(() => onCandidate?.(seen), [seen, onCandidate]);
 
+  const preparing = `Preparando los gestos…${progress !== null && progress < 100 ? ` ${progress} %` : ""}`;
   const currentGesture = GESTURES.find((gesture) => gesture.action === feedback.candidate);
   const instruction = props.disabled ? "Espera a que Robi termine."
     : feedback.releaseRequired ? "Retira la mano entre cada gesto."
@@ -121,7 +126,7 @@ export function VisionControls(props: Props) {
         </div>
         <div className="vision-camera" data-ready={status === "ready" || undefined}>
           <video ref={video} className="vision-video" muted playsInline aria-label="Vista de tu cámara" aria-describedby={helpId} hidden={status !== "camera" && status !== "ready"} />
-          {status === "camera" && <span className="vision-preparing">Preparando los gestos…</span>}
+          {status === "camera" && <span className="vision-preparing">{preparing}</span>}
           {status !== "camera" && status !== "ready" && <div className="vision-placeholder"><Icon name="camera" size={32} /><span>{status === "loading" ? "Encendiendo la cámara…" : "Programa con tus manos"}</span></div>}
         </div>
         <p className="small" role={status === "error" ? "alert" : "status"}>{message}</p>

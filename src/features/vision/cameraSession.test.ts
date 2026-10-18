@@ -38,11 +38,12 @@ function setup(getUserMedia?: () => Promise<MediaStream>) {
   vi.spyOn(video, "pause").mockImplementation(() => undefined);
   const onError = vi.fn();
   const onCamera = vi.fn();
+  const onProgress = vi.fn();
   const onReady = vi.fn();
   const onSample = vi.fn();
-  const stop = startCameraSession(video, { onError, onCamera, onReady, onSample, isPaused: () => false });
+  const stop = startCameraSession(video, { onError, onCamera, onProgress, onReady, onSample, isPaused: () => false });
   stops.push(stop);
-  return { stop, stopTrack, stream, video, onError, onCamera, onReady, onSample };
+  return { stop, stopTrack, stream, video, onError, onCamera, onProgress, onReady, onSample };
 }
 
 describe("ciclo de vida de la cámara", () => {
@@ -64,6 +65,12 @@ describe("ciclo de vida de la cámara", () => {
     expect(camera.onReady).not.toHaveBeenCalled();
     CameraWorker.latest.send({ type: "ready" });
     await vi.waitFor(() => expect(camera.onReady).toHaveBeenCalledOnce());
+  });
+
+  it("avisa a la pantalla cuánto lleva bajado el modelo", async () => {
+    const camera = setup();
+    CameraWorker.latest.send({ type: "progress", loaded: 4_000_000, total: 8_000_000 });
+    expect(camera.onProgress).toHaveBeenCalledWith(50);
   });
 
   it("volver a Gestos no vuelve a bajar ni a preparar el modelo", async () => {

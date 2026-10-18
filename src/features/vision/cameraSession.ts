@@ -5,6 +5,8 @@ type Callbacks = {
   onSample: (sample: GestureSample, time: number) => void;
   /** Ya se ve la imagen de la cámara; los gestos pueden seguir preparándose. */
   onCamera?: () => void;
+  /** Porcentaje del modelo de gestos ya bajado (solo la primera vez tarda). */
+  onProgress?: (percent: number) => void;
   /** Cámara y gestos listos: desde aquí llegan muestras. */
   onReady: () => void;
   onError: (message: string) => void;
@@ -103,6 +105,9 @@ export function startCameraSession(video: HTMLVideoElement, callbacks: Callbacks
         if (!callbacks.isPaused()) callbacks.onSample(sample, time);
       },
       onError: () => fail(LOAD_ERROR),
+      onProgress: (percent) => {
+        if (!stopped) callbacks.onProgress?.(percent);
+      },
     });
     recognizer.ready.then(
       () => {

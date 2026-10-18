@@ -76,6 +76,18 @@ describe("reconocedor de gestos compartido", () => {
     expect(FakeWorker.all).toHaveLength(1);
   });
 
+  it("el avance de la descarga llega a cada cámara, y la que llega tarde recibe el último valor", () => {
+    const first = { onSample: vi.fn(), onError: vi.fn(), onProgress: vi.fn() };
+    attachRecognizer(first);
+    worker().send({ type: "progress", loaded: 2_000_000, total: 8_000_000 });
+    expect(first.onProgress).toHaveBeenCalledWith(25);
+    const late = { onSample: vi.fn(), onError: vi.fn(), onProgress: vi.fn() };
+    attachRecognizer(late);
+    expect(late.onProgress).toHaveBeenCalledWith(25);
+    worker().send({ type: "progress", loaded: 8_000_000, total: 8_000_000 });
+    expect(late.onProgress).toHaveBeenLastCalledWith(100);
+  });
+
   it("si el modelo no carga, avisa a la cámara y la próxima vez empieza de nuevo", async () => {
     const camera = { onSample: vi.fn(), onError: vi.fn() };
     const a = attachRecognizer(camera);
