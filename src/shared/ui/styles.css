@@ -53,6 +53,22 @@
   --topic-ingenieria: #d9822b;
   --topic-artes: #8e5bd8;
   --topic-matematicas: #e0604f;
+  /* Tarjetas STEAM de la portada: un color vivo por tópico, su tono claro para la franja del nombre y la pintura de Artes. */
+  --steam-ciencia: #3ddc84;
+  --steam-tecnologia: #4da3ff;
+  --steam-ingenieria: #ff9f1c;
+  --steam-artes: #ff6fb5;
+  --steam-matematicas: #b388ff;
+  --steam-ciencia-wash: #d2f6e2;
+  --steam-tecnologia-wash: #d6e8ff;
+  --steam-ingenieria-wash: #ffe5c2;
+  --steam-artes-wash: #ffd6ea;
+  --steam-matematicas-wash: #e6d9ff;
+  --paint-yellow: #ffd400;
+  --paint-blue: #4da3ff;
+  --paint-green: #3ddc84;
+  --paint-violet: #b388ff;
+  --paint-red: #ff3b5c;
   --c-grass: #a8d58a;
   --c-grass-dark: #8cc06e;
   --radius: 12px;

@@ -19,7 +19,7 @@ const renderLanding = () =>
   );
 
 /** La tarjeta de un tópico: el enlace de la cuadrícula cuyo nombre es ese tópico. */
-const card = (name: string) => screen.getByText(name, { selector: ".topic-card > strong" }).closest("a") as HTMLElement;
+const card = (name: string) => screen.getByText(name, { selector: ".steam-card .steam-name" }).closest("a") as HTMLElement;
 
 describe("portada: tarjetas de tópico con su avance", () => {
   it("sin avance cada tópico muestra 0 de todo lo que tiene (retos de Inicial y misiones de Primaria)", () => {
@@ -47,7 +47,7 @@ describe("portada: tarjetas de tópico con su avance", () => {
     expect(within(card("Tecnología")).getByText("0/12 ✓")).toBeTruthy();
   });
 
-  it("cada tarjeta enlaza a su tópico y muestra su tagline", () => {
+  it("cada tarjeta enlaza a su tópico; el tagline lo oye el lector de pantalla pero no se ve (solo el nombre)", () => {
     renderLanding();
     expect(card("Ciencia").getAttribute("href")).toBe("/explorar/ciencia");
     expect(card("Matemáticas").getAttribute("href")).toBe("/explorar/matematicas");
@@ -56,6 +56,31 @@ describe("portada: tarjetas de tópico con su avance", () => {
     expect(within(card("Ingeniería")).getByText("Construye en el taller.")).toBeTruthy();
     expect(within(card("Artes")).getByText("Recorre la galería.")).toBeTruthy();
     expect(within(card("Matemáticas")).getByText("Cuenta los pasos.")).toBeTruthy();
+    for (const link of TOPICS.map((t) => card(t.name))) {
+      // El tagline y el avance son texto solo para lectores de pantalla: la tarjeta muestra solo el nombre.
+      expect(link.querySelector(".steam-name")!.className).not.toMatch(/sr-only/);
+      expect(link.querySelector(".steam-sr")!.classList.contains("sr-only")).toBe(true);
+    }
+    expect(card("Ciencia").textContent).toMatch(/Ciencia.*Explora el laboratorio\./);
+  });
+
+  it("cada tarjeta lleva la letra de STEAM y una escena del tema, decorativas (no las lee el lector de pantalla)", () => {
+    renderLanding();
+    const letters = TOPICS.map((t) => card(t.name).querySelector(".steam-letter")!.textContent);
+    expect(letters).toEqual(["S", "T", "E", "A", "M"]);
+    for (const t of TOPICS) {
+      const scene = card(t.name).querySelector(".steam-scene")!;
+      expect(scene.getAttribute("aria-hidden")).toBe("true");
+      expect(scene.querySelectorAll(".steam-deco").length).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it("el nombre accesible de cada enlace es el nombre, la bajada y el avance, sin la letra ni los adornos", () => {
+    renderLanding();
+    const link = screen.getByRole("link", { name: /^Ciencia/ });
+    expect(link.getAttribute("href")).toBe("/explorar/ciencia");
+    expect(link.textContent).toContain("0 de 12 retos resueltos");
+    expect(screen.getAllByRole("link").some((l) => /^S\b/.test(l.textContent ?? ""))).toBe(false);
   });
 
   it("marca la tarjeta como completa cuando se resolvió todo el tópico", () => {

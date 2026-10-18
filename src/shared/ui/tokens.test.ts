@@ -65,6 +65,11 @@ describe("contraste de los tokens (WCAG 2.2 AA)", () => {
   const GRAPHIC = 3;
 
   it.each([
+    ["nombre del tópico (tinta) sobre la franja de Ciencia", "--c-ink", "--steam-ciencia-wash", TEXT],
+    ["nombre del tópico (tinta) sobre la franja de Tecnología", "--c-ink", "--steam-tecnologia-wash", TEXT],
+    ["nombre del tópico (tinta) sobre la franja de Ingeniería", "--c-ink", "--steam-ingenieria-wash", TEXT],
+    ["nombre del tópico (tinta) sobre la franja de Artes", "--c-ink", "--steam-artes-wash", TEXT],
+    ["nombre del tópico (tinta) sobre la franja de Matemáticas", "--c-ink", "--steam-matematicas-wash", TEXT],
     ["texto de marca (enlaces, tabs, migas) sobre el fondo", "--c-brand-strong", "--c-bg", TEXT],
     ["texto de marca sobre las tarjetas", "--c-brand-strong", "--c-surface", TEXT],
     ["texto de marca sobre su fondo suave (badges, tab activa)", "--c-brand-strong", "--c-brand-soft", TEXT],
