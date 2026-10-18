@@ -7,13 +7,14 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const generate = vi.fn();
+const reviewLocal = vi.fn();
 const save = vi.fn();
 const createReto = vi.fn();
 const status = vi.fn();
 const classes = vi.fn();
 vi.mock("convex/react", () => ({
   useQuery: (ref: unknown) => (getFunctionName(ref as never) === "classrooms:listMine" ? classes() : status()),
-  useAction: () => generate,
+  useAction: (ref: unknown) => getFunctionName(ref as never) === "agent:reviewLocal" ? reviewLocal : generate,
   useMutation: (ref: unknown) => (getFunctionName(ref as never) === "assignments:create" ? createReto : save),
 }));
 
@@ -36,6 +37,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   generate.mockReset();
+  reviewLocal.mockReset();
+  vi.unstubAllGlobals();
   save.mockReset();
   createReto.mockReset();
 });
@@ -152,11 +155,12 @@ describe("asistente: describir el aprendizaje (G2)", () => {
     expect((screen.getByRole("link", { name: /Elegir un juego/ }) as HTMLAnchorElement).getAttribute("href")).toBe("/docente/retos/nuevo/juego");
   });
 
-  it("si ya se sabe que no está activado, no muestra el formulario", () => {
+  it("si la nube no está activada permite preparar la generación con Jetson", () => {
     status.mockReturnValue({ configured: false });
     renderPage();
-    expect(screen.getByRole("heading", { level: 1, name: "El asistente aún no está activado" })).toBeTruthy();
-    expect(screen.queryByLabelText("Aprendizaje")).toBeNull();
+    expect(screen.getByRole("button", { name: "Jetson por USB" })).toBeTruthy();
+    expect(screen.getByLabelText("Aprendizaje")).toBeTruthy();
+    expect(screen.getByText(/La generación en la nube no está activada/)).toBeTruthy();
   });
 
   it("Cancelar vuelve a los dos caminos", () => {
@@ -313,4 +317,75 @@ describe("asistente: revisar y guardar (G3)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Atrás/ }));
     expect((screen.getByLabelText("Aprendizaje") as HTMLTextAreaElement).value).toBe(OBJETIVO);
   });
+});
+
+
+it("usa USB para inferencia y muestra solo lo certificado por Convex antes de guardar", async () => {
+  const draft = { ...M(2), title: "Sin verificar" };
+  const certified = { ...proposal(2), mission: { ...M(2), title: "Huerto certificado" } };
+  const fetchLocal = vi.fn<typeof fetch>().mockImplementation(async (url) => String(url).endsWith("/health")
+    ? Response.json({ ready: true, model: "qwen2.5:3b-instruct-q4_K_M" })
+    : Response.json({ missions: [draft], failed: [] }));
+  vi.stubGlobal("fetch", fetchLocal);
+  reviewLocal.mockResolvedValue({ status: "ok", proposals: [certified], failed: [] });
+  status.mockReturnValue({ configured: false });
+  renderPage(); type();
+  fireEvent.click(screen.getByRole("button", { name: "Jetson por USB" }));
+  await screen.findByText(/Jetson conectada/);
+  fireEvent.click(screen.getByRole("button", { name: "Jetson por USB" }));
+  expect(propose().disabled).toBe(false);
+  fireEvent.click(propose());
+  await screen.findByText("Huerto certificado");
+  expect(screen.queryByText("Sin verificar")).toBeNull();
+  expect(generate).not.toHaveBeenCalled();
+  expect(reviewLocal).toHaveBeenCalledWith({ objective: OBJETIVO, grades: [2, 3], difficulty: "balanced", missions: [draft] });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar y asignar a una clase" }));
+  await screen.findByText("Guardamos tu misión");
+  expect(save).toHaveBeenCalledWith({ mission: certified.mission });
+});
+
+it("conserva el aprendizaje y explica la desconexión sin pasar a la nube", async () => {
+  vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockRejectedValue(new TypeError("Failed to fetch")));
+  renderPage(); type();
+  fireEvent.click(screen.getByRole("button", { name: "Jetson por USB" }));
+  await screen.findByText(/No encontramos el conector local/);
+  expect((screen.getByLabelText("Aprendizaje") as HTMLTextAreaElement).value).toBe(OBJETIVO);
+  expect(generate).not.toHaveBeenCalled();
+  expect(propose().disabled).toBe(true);
+});
+
+it("explica un fallo local después de comprobar conexión sin recurrir a la nube", async () => {
+  vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockImplementation(async url => String(url).endsWith("/health") ? Response.json({ ready: true }) : new Response("", { status: 409 })));
+  renderPage(); type(); fireEvent.click(screen.getByRole("button", { name: "Jetson por USB" }));
+  await screen.findByText(/Jetson conectada/); fireEvent.click(propose());
+  expect(await screen.findByRole("alert")).toHaveProperty("textContent", "La Jetson está generando otra misión. Espera a que termine.");
+  expect((screen.getByLabelText("Aprendizaje") as HTMLTextAreaElement).value).toBe(OBJETIVO);
+  expect(generate).not.toHaveBeenCalled();
+});
+
+it("mantiene una sola regeneración local y la cancela al salir", async () => {
+  let posts = 0; let pendingSignal: AbortSignal | undefined;
+  vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+    if (String(url).endsWith("/health")) return Response.json({ ready: true });
+    if (++posts === 1) return Response.json({ missions: [M(2)], failed: [] });
+    pendingSignal = init?.signal ?? undefined;
+    return new Promise((_resolve, reject) => pendingSignal?.addEventListener("abort", () => reject(new DOMException("Cancelado", "AbortError")), { once: true }));
+  }));
+  reviewLocal.mockResolvedValue({ status: "ok", proposals: [proposal(2)], failed: [] });
+  renderPage(); type(); fireEvent.click(screen.getByRole("button", { name: "Jetson por USB" }));
+  await screen.findByText(/Jetson conectada/); fireEvent.click(propose());
+  await screen.findByRole("heading", { name: "Revisa las propuestas" });
+  fireEvent.click(screen.getByRole("button", { name: /Pedir otra propuesta/ }));
+  await waitFor(() => expect(pendingSignal).toBeTruthy());
+  expect((screen.getByRole("button", { name: "Atrás" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "Guardar y asignar a una clase" }) as HTMLButtonElement).disabled).toBe(true);
+  cleanup(); expect(pendingSignal?.aborted).toBe(true);
+});
+
+it("explica que un mapa local no pasó la revisión sin culpar al aprendizaje", async () => {
+  vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockImplementation(async url => String(url).endsWith("/health") ? Response.json({ ready: true }) : Response.json({ missions: [], failed: [{ grade: 2, code: "UNSOLVABLE" }] })));
+  renderPage(); type(); fireEvent.click(screen.getByRole("button", { name: "Jetson por USB" }));
+  await screen.findByText(/Jetson conectada/); fireEvent.click(propose());
+  expect(await screen.findByRole("heading", { name: /El mapa no pasó la revisión/ })).toBeTruthy();
+  expect((screen.getByLabelText("Aprendizaje") as HTMLTextAreaElement).value).toBe(OBJETIVO);
 });

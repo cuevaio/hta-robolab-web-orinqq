@@ -1,11 +1,13 @@
 import { useAction, useMutation, useQuery } from "convex/react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "@robolab/backend/convex/_generated/api";
 import type { Id } from "@robolab/backend/convex/_generated/dataModel";
 import { agentChallengeId } from "@robolab/backend/domain/classroom/agentItem";
 import { userMessage } from "../../../../shared/errors";
 import { Icon } from "../../../../shared/ui/Icon";
+import { useFocusOnMount } from "../../../../shared/useFocusOnMount";
+import { checkLocalModel, LocalGenerationError, requestLocalMissions } from "./localGeneration";
 import { usePageTitle } from "../../../../shared/usePageTitle";
 import { MissionPlayer } from "../../../mission/MissionPlayer";
 import { CreatorStepper } from "../CreatorStepper";
@@ -41,7 +43,7 @@ const FAILURE: Record<"busy" | "slow" | "incomplete" | "down", { emoji: string; 
   down: { emoji: "🔌", title: "El asistente no está disponible", text: "Avisa a quien administra RoboLab. Mientras, puedes elegir un juego ya hecho." },
 };
 
-function failureKind(code: FailureCode): keyof typeof FAILURE {
+function failureKind(code: FailureCode | string): keyof typeof FAILURE {
   if (code === "PROVIDER_RATE_LIMIT") return "busy";
   if (code === "PROVIDER_TIMEOUT" || code === "PROVIDER_UNAVAILABLE") return "slow";
   if (code === "PROVIDER_AUTH" || code === "PROVIDER_NOT_CONFIGURED") return "down";
@@ -57,6 +59,26 @@ export function AssistantPage() {
   const navigate = useNavigate();
   const status = useQuery(api.agent.status);
   const generate = useAction(api.agent.generate);
+  const reviewLocal = useAction(api.agent.reviewLocal);
+  const focusTitle = useFocusOnMount<HTMLHeadingElement>();
+  const [source, setSource] = useState<"cloud" | "local">("cloud");
+  const [connection, setConnection] = useState<"idle" | "checking" | "ready" | "unavailable">("idle");
+  const [connectionError, setConnectionError] = useState("");
+  const [checkCount, setCheckCount] = useState(0);
+  const localRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => localRequest.current?.abort(), []);
+  useEffect(() => {
+    if (source !== "local") return;
+    const controller = new AbortController();
+    void checkLocalModel(controller.signal).then(ready => {
+      if (controller.signal.aborted) return;
+      setConnection(ready ? "ready" : "unavailable");
+      if (!ready) setConnectionError("El modelo no está disponible. Revisa la conexión USB y Ollama en la Jetson.");
+    }).catch((error: unknown) => {
+      if (!controller.signal.aborted) { setConnection("unavailable"); setConnectionError(error instanceof Error ? error.message : "No encontramos el conector local."); }
+    });
+    return () => controller.abort();
+  }, [source, checkCount]);
   const save = useMutation(api.agent.save);
   const createReto = useMutation(api.assignments.create);
   const classes = useQuery(api.classrooms.listMine);
@@ -83,6 +105,18 @@ export function AssistantPage() {
 
   const toggleGrade = (g: Grade) => setGrades((cur) => (cur.includes(g) ? cur.filter((x) => x !== g) : [...cur, g].sort() as Grade[]));
 
+  async function generateFromSource(selectedGrades: readonly Grade[]) {
+    const request = { objective: text, grades: [...selectedGrades], difficulty };
+    if (source === "cloud") return generate(request);
+    const controller = new AbortController(); localRequest.current = controller;
+    try {
+      const local = await requestLocalMissions(request, controller.signal);
+      if (!local.missions.length) return { status: "ok" as const, proposals: [], failed: local.failed };
+      const checked = await reviewLocal({ ...request, missions: local.missions });
+      return { ...checked, failed: checked.failed.map(f => local.failed.find(localFailure => localFailure.grade === f.grade) ?? f) };
+    } finally { if (localRequest.current === controller) localRequest.current = null; }
+  }
+
   async function ask(event: FormEvent) {
     event.preventDefault();
     if (!valid) return;
@@ -90,7 +124,7 @@ export function AssistantPage() {
     setError(null);
     setFailure(null);
     try {
-      const result = await generate({ objective: text, grades: [...grades], difficulty });
+      const result = await generateFromSource(grades);
       if (result.status === "not_configured") {
         setFailure("down");
         setPhase("describe");
@@ -106,7 +140,7 @@ export function AssistantPage() {
       setMissing(result.failed.map((f) => f.grade));
       setPhase("review");
     } catch (e) {
-      setError(userMessage(e, "No pudimos pedirle misiones al asistente. Intenta de nuevo."));
+      setError(e instanceof LocalGenerationError ? e.message : userMessage(e, "No pudimos pedirle misiones al asistente. Intenta de nuevo."));
       setPhase("describe");
     }
   }
@@ -115,12 +149,12 @@ export function AssistantPage() {
     setAsking((cur) => [...cur, grade]);
     setError(null);
     try {
-      const result = await generate({ objective: text, grades: [grade], difficulty });
+      const result = await generateFromSource([grade]);
       const fresh = result.status === "ok" ? result.proposals[0] : undefined;
       if (fresh) setProposals((cur) => cur.map((p) => (p.grade === grade ? fresh : p)));
       else setError(`No pudimos armar otra misión verificada para ${gradeName(grade)} grado. Conservamos la anterior.`);
     } catch (e) {
-      setError(userMessage(e, "No pudimos pedir otra propuesta. Intenta de nuevo."));
+      setError(e instanceof LocalGenerationError ? e.message : userMessage(e, "No pudimos pedir otra propuesta. Intenta de nuevo."));
     } finally {
       setAsking((cur) => cur.filter((g) => g !== grade));
     }
@@ -162,21 +196,6 @@ export function AssistantPage() {
 
   const stepIndex = phase === "review" ? 1 : phase === "saved" ? 2 : 0;
 
-  if (status?.configured === false) {
-    return (
-      <section className="stack" aria-labelledby="assistant-title">
-        <h1 id="assistant-title" className="creator-title">
-          El asistente aún no está activado
-        </h1>
-        <p>Pide a quien administra RoboLab que lo active. Mientras, puedes elegir un juego ya hecho.</p>
-        <div>
-          <Link className="btn" to={GAME_PATH}>
-            Elegir un juego <Icon name="chevronRight" size={16} />
-          </Link>
-        </div>
-      </section>
-    );
-  }
 
   return (
     <div className="stack creator" aria-labelledby="assistant-title" role="group">
@@ -194,7 +213,7 @@ export function AssistantPage() {
         </section>
       ) : phase === "saved" ? (
         <section className="stack" aria-live="polite">
-          <h1 id="assistant-title" className="creator-title">
+          <h1 key={phase} ref={focusTitle} tabIndex={-1} id="assistant-title" className="creator-title">
             {savedIds.length === 1 ? "Guardamos tu misión" : `Guardamos tus ${savedIds.length} misiones`}
           </h1>
           {assignedTo ? (
@@ -249,7 +268,7 @@ export function AssistantPage() {
       ) : phase === "review" ? (
         <section className="stack" aria-labelledby="assistant-title">
           <div className="stack-sm">
-            <h1 id="assistant-title" className="creator-title">
+            <h1 key={phase} ref={focusTitle} tabIndex={-1} id="assistant-title" className="creator-title">
               Revisa las propuestas
             </h1>
             <p className="small muted">
@@ -290,10 +309,10 @@ export function AssistantPage() {
                     >
                       {on && <Icon name="check" size={16} />} Usar
                     </button>
-                    <button type="button" className="btn" onClick={() => setTrying(p)}>
+                    <button type="button" className="btn" disabled={source === "local" && asking.length > 0} onClick={() => setTrying(p)}>
                       <Icon name="play" size={16} /> Probar
                     </button>
-                    <button type="button" className="btn btn-ghost btn-sm" disabled={busy} aria-busy={busy} aria-label={`Pedir otra propuesta para ${gradeName(p.grade)} grado`} onClick={() => void another(p.grade)}>
+                    <button type="button" className="btn btn-ghost btn-sm" disabled={busy || (source === "local" && asking.length > 0)} aria-busy={busy} aria-label={`Pedir otra propuesta para ${gradeName(p.grade)} grado`} onClick={() => void another(p.grade)}>
                       <Icon name="rotate" size={16} /> {busy ? "Pensando…" : "Otra"}
                     </button>
                   </div>
@@ -307,13 +326,13 @@ export function AssistantPage() {
             </p>
           )}
           <div className="row creator-actions">
-            <button type="button" className="link-btn" onClick={() => setPhase("describe")}>
+            <button type="button" className="link-btn" disabled={source === "local" && asking.length > 0} onClick={() => setPhase("describe")}>
               <Icon name="arrowLeft" size={16} /> Atrás
             </button>
             <span className="small" aria-live="polite">
               {chosen.size === 1 ? "1 misión elegida" : `${chosen.size} misiones elegidas`}
             </span>
-            <button type="button" className="btn btn-primary" disabled={chosen.size === 0 || saving} aria-busy={saving} onClick={() => void saveChosen()}>
+            <button type="button" className="btn btn-primary" disabled={chosen.size === 0 || saving || (source === "local" && asking.length > 0)} aria-busy={saving} onClick={() => void saveChosen()}>
               {saving ? "Guardando…" : "Guardar y asignar a una clase"}
             </button>
           </div>
@@ -321,11 +340,28 @@ export function AssistantPage() {
       ) : (
         <form className="stack" onSubmit={ask} aria-labelledby="assistant-title" noValidate>
           <div className="stack-sm">
-            <h1 id="assistant-title" className="creator-title">
+            <h1 key={phase} ref={focusTitle} tabIndex={-1} id="assistant-title" className="creator-title">
               Cuéntale al asistente qué quieres que aprendan
             </h1>
             <p className="small muted">Propone una misión por grado. Tú la revisas antes de usarla.</p>
           </div>
+          <fieldset className="card stack-sm" disabled={phase === "loading"}>
+            <legend>Dónde generar</legend>
+            <div className="row">
+              <button type="button" className="chip-btn" aria-pressed={source === "cloud"} onClick={() => setSource("cloud")}>Nube</button>
+              <button type="button" className="chip-btn" aria-pressed={source === "local"} onClick={() => { if (source !== "local") { setSource("local"); setConnection("checking"); setConnectionError(""); } }}>Jetson por USB</button>
+            </div>
+            {source === "cloud" ? (
+              <p className="small" role="status">{status?.configured === false ? "La generación en la nube no está activada. Puedes usar una Jetson conectada a esta laptop." : "Usa el asistente en línea de RoboLab."}</p>
+            ) : (
+              <>
+                <p className="small">Qwen genera en tu Jetson. Para revisar, guardar y asignar seguimos usando RoboLab en línea.</p>
+                <p className="small" role="status">{connection === "ready" ? "Jetson conectada · Qwen 2.5 3B" : connection === "checking" ? "Comprobando la conexión…" : connectionError}</p>
+                <p className="small muted">Conecta la Jetson por USB y mantén abierto el conector local en esta laptop.</p>
+                {connection === "unavailable" && <div><button type="button" className="btn btn-sm" onClick={() => { setConnection("checking"); setConnectionError(""); setCheckCount(n => n + 1); }}>Comprobar conexión</button></div>}
+              </>
+            )}
+          </fieldset>
           <div className="card assistant-form stack">
             <div className="field">
               <label htmlFor="objective">Aprendizaje</label>
@@ -372,16 +408,16 @@ export function AssistantPage() {
               <h2 className="proposal-grade">
                 <span aria-hidden="true">⏳</span> Pensando la misión de {list(grades)}…
               </h2>
-              <p className="small">Tarda unos segundos; puedes esperar aquí.</p>
+              <p className="small">{source === "local" ? "La Jetson puede tardar unos minutos. Puedes esperar aquí." : "Tarda unos segundos; puedes esperar aquí."}</p>
               <progress aria-label="Pensando" />
             </div>
           )}
           {failure && (
             <div className="card stack-sm" role="alert">
               <h2 className="proposal-grade">
-                <span aria-hidden="true">{FAILURE[failure].emoji}</span> {FAILURE[failure].title}
+                <span aria-hidden="true">{FAILURE[failure].emoji}</span> {source === "local" && failure === "incomplete" ? "El mapa no pasó la revisión" : FAILURE[failure].title}
               </h2>
-              <p className="small">{FAILURE[failure].text}</p>
+              <p className="small">{source === "local" && failure === "incomplete" ? "Qwen no pudo crear un mapa que se pueda resolver. Conservamos tu aprendizaje; puedes reintentar." : FAILURE[failure].text}</p>
               {failure === "down" && (
                 <div>
                   <Link className="btn btn-sm" to={GAME_PATH}>
@@ -401,8 +437,8 @@ export function AssistantPage() {
             <button type="button" className="link-btn" onClick={() => navigate("/docente/retos/nuevo")}>
               Cancelar
             </button>
-            <span className="small muted">Tarda unos segundos. Hasta 3 intentos por grado.</span>
-            <button type="submit" className="btn btn-primary" disabled={!valid || phase === "loading"} aria-busy={phase === "loading"}>
+            <span className="small muted">{source === "local" ? "Generación local. Hasta 3 intentos por grado." : "Tarda unos segundos. Hasta 3 intentos por grado."}</span>
+            <button type="submit" className="btn btn-primary" disabled={!valid || phase === "loading" || (source === "local" ? connection !== "ready" : status?.configured === false)} aria-busy={phase === "loading"}>
               {phase === "loading" ? "Pensando…" : failure && failure !== "down" ? "Reintentar" : "Proponer misiones"}
             </button>
           </div>

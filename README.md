@@ -337,3 +337,9 @@ apuntan al propio equipo de cada alumno. El backend necesita el cambio `liveRoom
 del PR vinculado antes de utilizar estas pantallas. El paquete del backend queda
 fijado por commit en `package-lock.json`; después de integrar el PR del backend
 puede actualizarse a `orinqq/robolab-backend#main` con el comando habitual.
+
+### Generación en Jetson por USB
+
+El asistente docente permite elegir «Nube» o «Jetson por USB». La opción local usa Qwen 2.5 3B Instruct mediante el conector de la laptop; el navegador no llama al proveedor cloud cuando se elige Jetson. Las propuestas locales también pasan por Convex antes de mostrarse y al guardarse: la sesión, revisión y asignación siguen necesitando internet.
+
+La preparación de Ollama, el túnel USB y el conector está en la [guía del backend](https://github.com/orinqq/robolab-backend/blob/main/docs/JETSON.md). La web accede al conector en `http://127.0.0.1:8765`; no necesita nuevas variables `VITE_…` ni claves de modelos. El navegador puede pedir permiso de acceso a red local.
