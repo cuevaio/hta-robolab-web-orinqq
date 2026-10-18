@@ -1,12 +1,10 @@
 import { useMutation, useQuery } from "convex/react";
-import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "@robolab/backend/convex/_generated/api";
 import { Icon } from "../../shared/ui/Icon";
 import { usePageTitle } from "../../shared/usePageTitle";
 import { ExploreLayout, LEVEL_INFO } from "../explore/ExploreLayout";
 import { emojiFor, kindLabel } from "../explore/catalog";
-import { speak } from "./speech";
 import "./join.css";
 
 type Props = { token: string; onSignOut: () => void };
@@ -19,10 +17,6 @@ export function StudentHome({ token, onSignOut }: Props) {
   const navigate = useNavigate();
 
   const challenges = home?.classChallenges ?? [];
-  const name = home?.displayName;
-  useEffect(() => {
-    if (name) speak(`¡Hola, ${name}!`);
-  }, [name]);
 
   // Al salir vuelve a la portada, donde se elige un tópico o "Unirme a una clase".
   async function leave() {

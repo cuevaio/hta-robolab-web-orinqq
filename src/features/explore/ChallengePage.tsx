@@ -26,7 +26,6 @@ import { useRobotLink, type RobotSync } from "../robot/useRobotLink";
 import { STEP_MS, useRunner } from "../game/useRunner";
 import { useStudentToken } from "../student/session";
 import { playSound, shouldStepSound } from "../../shared/sound/sounds";
-import { speak } from "../student/speech";
 import { ChallengeDone } from "./ChallengeDone";
 import { Breadcrumbs, ExploreLayout, LEVEL_INFO } from "./ExploreLayout";
 import { deviceId, useExploreProgress } from "./storage";
@@ -137,7 +136,6 @@ function Play({ challenge, robot, onSolved }: { challenge: Challenge; robot: Rob
 
   const say = (mood: Mood, message: string) => {
     setGuide({ mood, message });
-    if (challenge.level === "inicial") speak(message);
   };
 
   const finish = (submission: Submission) => {
@@ -366,7 +364,6 @@ function ChallengePage({ challenge }: { challenge: Challenge }) {
           challenge={challenge}
           onStart={() => {
             setPhase("play");
-            if (challenge.level === "inicial") speak(challenge.story);
           }}
         />
       )}
