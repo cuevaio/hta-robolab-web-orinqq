@@ -4,6 +4,7 @@ import { policyFor } from "@robolab/backend/domain/game/levels";
 import { type Block, compile } from "@robolab/backend/domain/game/program";
 import type { ExecutionState, ExecutionTrace, Mission } from "@robolab/backend/domain/mission/contracts";
 import { executeMission } from "@robolab/backend/domain/mission/engine";
+import { playSound, shouldStepSound } from "../../shared/sound/sounds";
 import { Icon } from "../../shared/ui/Icon";
 import { GuideAvatar, type Mood } from "../../shared/ui/Guide";
 import { BlockEditor } from "../game/BlockEditor";
@@ -54,6 +55,7 @@ export function MissionPlayer({ mission, onSolved, after }: Props) {
   function finish(trace: ExecutionTrace, blocks: readonly Block[], runCount: number) {
     setRunning(false);
     const ok = trace.outcome === "SUCCESS";
+    playSound(ok ? "win" : "oops");
     setGuide({ mood: ok ? "happy" : trace.outcome === "COLLISION" || trace.outcome === "OUT_OF_BOUNDS" ? "surprised" : "thinking", message: outcomeMessage(trace.outcome, trace.failedStep) });
     if (!ok) return;
     setSolved(true);
@@ -78,8 +80,14 @@ export function MissionPlayer({ mission, onSolved, after }: Props) {
     setRunning(true);
     setView(initial);
     setGuide({ mood: "thinking", message: "Mira cómo se mueve Kusi…" });
+    playSound("play");
     trace.steps.forEach((step, i) => {
-      timers.current.push(window.setTimeout(() => setView(step.state), (i + 1) * STEP_MS));
+      timers.current.push(
+        window.setTimeout(() => {
+          setView(step.state);
+          if (shouldStepSound(i, trace.steps.length)) playSound("step");
+        }, (i + 1) * STEP_MS),
+      );
     });
     timers.current.push(window.setTimeout(() => finish(trace, blocks, runCount), (trace.steps.length + 1) * STEP_MS));
   }

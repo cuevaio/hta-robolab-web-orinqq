@@ -9,6 +9,7 @@ import { type Execution, type LabError, type LabStep, execute, messageFor, nextH
 import { ARROW, DIRS, DIR_LABEL, type Dir, MAX_ARROWS, type Mission, cellKey, missionById } from "@robolab/backend/domain/lab/mission";
 import { arrowsToProgram, headingAfter } from "@robolab/backend/domain/lab/robot";
 import { countVisited, solve } from "@robolab/backend/domain/lab/solve";
+import { playSound, shouldStepSound } from "../../shared/sound/sounds";
 import { Guide, type Mood } from "../../shared/ui/Guide";
 import { Icon } from "../../shared/ui/Icon";
 import { deviceId, useExploreProgress } from "../explore/storage";
@@ -203,21 +204,25 @@ function LevelPlay({ mission, missionId, level, onSolved, onNextLevel }: LevelPr
       return;
     }
     setArrows([...arrows, dir]);
+    playSound("place");
     invalidate();
   }
 
   function removeAt(index: number) {
     setArrows(arrows.filter((_, i) => i !== index));
+    playSound("remove");
     invalidate();
   }
 
   function undo() {
     setArrows(arrows.slice(0, -1));
+    playSound("remove");
     invalidate();
   }
 
   function clear() {
     setArrows([]);
+    playSound("remove");
     invalidate();
     say("idle", "Programa limpio. Prueba otra estrategia.");
   }
@@ -232,8 +237,14 @@ function LevelPlay({ mission, missionId, level, onSolved, onNextLevel }: LevelPr
     setTrace([]);
     setBoardMood("idle");
     say("thinking", "Ejecutando tu programa…");
+    playSound("play");
     result.steps.forEach((_, i) => {
-      timers.current.push(window.setTimeout(() => setTrace(result.steps.slice(0, i + 1)), i * ms));
+      timers.current.push(
+        window.setTimeout(() => {
+          setTrace(result.steps.slice(0, i + 1));
+          if (shouldStepSound(i, result.steps.length)) playSound("step");
+        }, i * ms),
+      );
     });
     timers.current.push(window.setTimeout(() => finish(result), result.steps.length * ms + 200));
     // El servidor vuelve a ejecutar y anota; la animación no espera por la red.
@@ -254,6 +265,7 @@ function LevelPlay({ mission, missionId, level, onSolved, onNextLevel }: LevelPr
     setLastError(result.error);
     setCompleted(result.ok);
     setBoardMood(result.ok ? "success" : result.error === "El robot chocó con una pared" || result.error === "Fuera del tablero" ? "error" : "idle");
+    playSound(result.ok ? "win" : "oops");
     say(result.ok ? "happy" : MOOD_FOR[result.error!], messageFor(result));
     if (result.ok) onSolved({ runs: runs.current, hints, ms: now() - startedAt, arrows });
   }

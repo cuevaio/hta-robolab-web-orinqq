@@ -17,7 +17,7 @@ export type RunnerState = {
  * Anima la simulación paso a paso. La simulación se calcula completa al
  * inicio (es determinista); la animación solo la reproduce.
  */
-export function useRunner(map: GameMap, onFinish: (outcome: Outcome) => void) {
+export function useRunner(map: GameMap, onFinish: (outcome: Outcome) => void, onStep?: (index: number, total: number) => void) {
   const initial: RobotState = { cell: map.start, heading: map.startHeading };
   const [state, setState] = useState<RunnerState>({
     robot: initial,
@@ -28,8 +28,10 @@ export function useRunner(map: GameMap, onFinish: (outcome: Outcome) => void) {
   });
   const timers = useRef<number[]>([]);
   const finish = useRef(onFinish);
+  const stepped = useRef(onStep);
   useEffect(() => {
     finish.current = onFinish;
+    stepped.current = onStep;
   });
 
   const clearTimers = () => {
@@ -55,6 +57,7 @@ export function useRunner(map: GameMap, onFinish: (outcome: Outcome) => void) {
         timers.current.push(
           window.setTimeout(() => {
             setState((s) => ({ ...s, robot: step.state, activePath: steps[i]?.source ?? null }));
+            stepped.current?.(i, simulation.steps.length);
           }, (i + 1) * STEP_MS),
         );
       });

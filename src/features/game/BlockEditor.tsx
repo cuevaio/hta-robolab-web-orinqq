@@ -4,7 +4,7 @@ import { COMMANDS, type BlockPath, type Command, MAX_REPEAT, MIN_REPEAT } from "
 import type { LevelPolicy } from "@robolab/backend/domain/game/levels";
 import { Icon } from "../../shared/ui/Icon";
 import { IconButton } from "../../shared/ui/IconButton";
-import { speak } from "../student/speech";
+import { playSound } from "../../shared/sound/sounds";
 import { BLOCK_LOOK, MIN_SLOTS, REPEAT_LOOK } from "./blocks";
 import { PieceFrame } from "./PieceFrame";
 import "./palette.css";
@@ -68,8 +68,8 @@ export function PieceTray({
                 aria-label={BLOCK_LOOK[command].label}
                 onClick={() => {
                   dispatch({ type: "add", command });
-                  // En Gestos los comandos van en silencio; con Botones se dicen para quien aún no lee.
-                  if (!gestures) speak(BLOCK_LOOK[command].label);
+                  // Sin voz que repita la acción: el niño ve la pieza; solo suena un «plop».
+                  playSound("place");
                 }}
               >
                 {gesture ? (
@@ -91,7 +91,10 @@ export function PieceTray({
               data-piece="repeat"
               disabled={disabled || state.openRepeat !== null}
               aria-label={REPEAT_LOOK.label}
-              onClick={() => dispatch({ type: "addRepeat" })}
+              onClick={() => {
+                dispatch({ type: "addRepeat" });
+                playSound("place");
+              }}
             >
               <img src={REPEAT_LOOK.icon} alt="" />
             </button>
@@ -145,6 +148,7 @@ export function Sequence({
 
   const clear = () => {
     dispatch({ type: "clear" });
+    playSound("remove");
     onClear?.();
   };
 
@@ -167,7 +171,10 @@ export function Sequence({
                   data-state={toneOf([i])}
                   disabled={disabled}
                   aria-label={`Paso ${stepNumber}: ${BLOCK_LOOK[block.command].label}.${readOnly ? "" : " Toca para quitar."}`}
-                  onClick={() => dispatch({ type: "remove", path: [i] })}
+                  onClick={() => {
+                    dispatch({ type: "remove", path: [i] });
+                    playSound("remove");
+                  }}
                 >
                   <span className="step-n" aria-hidden="true">
                     {stepNumber}
@@ -208,7 +215,10 @@ export function Sequence({
                         data-state={toneOf([i, j])}
                         disabled={disabled}
                         aria-label={`${BLOCK_LOOK[child.command].label} dentro de repetir.${readOnly ? "" : " Toca para quitar."}`}
-                        onClick={() => dispatch({ type: "remove", path: [i, j] })}
+                        onClick={() => {
+                          dispatch({ type: "remove", path: [i, j] });
+                          playSound("remove");
+                        }}
                       >
                         <img src={BLOCK_LOOK[child.command].icon} alt="" />
                       </button>
@@ -226,7 +236,10 @@ export function Sequence({
                   type="button"
                   disabled={disabled}
                   aria-label="Quitar repetir"
-                  onClick={() => dispatch({ type: "remove", path: [i] })}
+                  onClick={() => {
+                    dispatch({ type: "remove", path: [i] });
+                    playSound("remove");
+                  }}
                 >
                   <Icon name="x" />
                 </button>
