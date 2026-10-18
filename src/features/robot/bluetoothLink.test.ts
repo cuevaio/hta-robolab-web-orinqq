@@ -111,9 +111,9 @@ describe("vínculo Bluetooth Classic por Web Serial", () => {
     robot.port.open = () => new Promise((resolve) => { finishOpen = resolve; startedOpen(); });
     const connecting = robot.link.connect();
     await opening;
-    await robot.link.disconnect();
+    const disconnecting = robot.link.disconnect();
     finishOpen();
-    await connecting;
+    await Promise.all([connecting, disconnecting]);
     expect(robot.port.close).toHaveBeenCalledOnce();
     expect(robot.link.getSnapshot().state).toBe("off");
   });
@@ -189,4 +189,69 @@ describe("vínculo Bluetooth Classic por Web Serial", () => {
       expect(robot.port.close).toHaveBeenCalledOnce();
     }
   });
+});
+
+describe("recuperación del puerto al volver a conectar", () => {
+  it("espera que termine una apertura cancelada antes de abrir el siguiente puerto", async () => {
+    const old = device();
+    const next = device();
+    let finishOpen!: () => void;
+    let finishClose!: () => void;
+    old.port.close = vi.fn(() => new Promise<void>((resolve) => { finishClose = resolve; }));
+    let didStart!: () => void;
+    const started = new Promise<void>((resolve) => { didStart = resolve; });
+    old.port.open = vi.fn(() => new Promise<void>((resolve) => { finishOpen = resolve; didStart(); }));
+    old.serial.requestPort.mockResolvedValueOnce(old.port).mockResolvedValueOnce(next.port);
+    const first = old.link.connect();
+    await started;
+    const closing = old.link.disconnect();
+    const reconnecting = old.link.connect();
+    finishOpen();
+    await vi.waitFor(() => expect(old.port.close).toHaveBeenCalledOnce());
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(next.port.open).not.toHaveBeenCalled();
+    finishClose();
+    await Promise.all([first, closing, reconnecting]);
+    expect(old.port.close).toHaveBeenCalledOnce();
+    expect(next.port.open).toHaveBeenCalledOnce();
+    expect(old.link.getSnapshot().state).toBe("on");
+    await old.link.disconnect();
+  });
+
+  it("no confunde un dispositivo desaparecido al abrir con cancelar el selector", async () => {
+    const robot = device();
+    robot.port.open = vi.fn(async () => { throw new DOMException("The device has been lost", "NotFoundError"); });
+    await robot.link.connect();
+    expect(robot.link.getSnapshot().state).toBe("off");
+    expect(robot.link.getSnapshot().error).toMatch(/encendido|conexión|puerto|Bluetooth/i);
+  });
+
+  it("conserva la etapa y el error original cuando el sistema rechaza abrir el puerto", async () => {
+    const robot = device();
+    robot.port.open = vi.fn(async () => { throw new DOMException("Failed to open serial port.", "NetworkError"); });
+    await robot.link.connect();
+    expect(robot.link.getSnapshot()).toMatchObject({ state: "off", diagnostic: {
+      stage: "open", name: "NetworkError", message: "Failed to open serial port.",
+    } });
+    expect(robot.link.getSnapshot().error).toMatch(/encendido/);
+  });
+});
+
+it("una pantalla nueva espera al cierre Bluetooth de la pantalla anterior", async () => {
+  const old = device();
+  const next = device();
+  let finishClose!: () => void;
+  old.port.close = vi.fn(() => new Promise<void>((resolve) => { finishClose = resolve; }));
+  old.serial.requestPort.mockResolvedValueOnce(old.port).mockResolvedValueOnce(next.port);
+  await old.link.connect();
+  const closing = old.link.disconnect();
+  await vi.waitFor(() => expect(old.port.close).toHaveBeenCalledOnce());
+  const newScreen = createBluetoothLink({ serial: old.serial });
+  const connecting = newScreen.connect();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  expect(next.port.open).not.toHaveBeenCalled();
+  finishClose();
+  await Promise.all([closing, connecting]);
+  expect(newScreen.getSnapshot().state).toBe("on");
+  await newScreen.disconnect();
 });
