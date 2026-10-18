@@ -41,7 +41,7 @@ export function LivePlayer({ room, token }: { room: RoomView; token: string }) {
 
   const message = finished
     ? cooperative ? "¡Lo lograron en equipo!" : `¡Laberinto resuelto! Llegaste en el puesto ${place ?? "—"}.`
-    : result.outcome === "OFF_PATH" ? "Wayra salió del camino. Cambia tu programa."
+    : result.outcome === "OFF_PATH" ? "Robi salió del camino. Cambia tu programa."
     : result.outcome === "INCOMPLETE" ? "Todavía falta llegar a la estrella."
     : result.outcome === "EMPTY" ? "Agrega movimientos y vuelve a ejecutar." : "Arma los movimientos para llegar a la estrella.";
 

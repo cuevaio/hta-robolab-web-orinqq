@@ -6,7 +6,7 @@ import { ToastProvider } from "../../shared/ui/Toast";
 
 /** `robot.status` del servidor y las mutaciones (envío al robot, registro de la partida): las decide cada prueba. */
 const status = vi.fn();
-const mutation = vi.fn(async (_args?: unknown) => ({ robotName: "Wayra-12", letters: "FFF" }));
+const mutation = vi.fn(async (_args?: unknown) => ({ robotName: "Robi-12", letters: "FFF" }));
 vi.mock("convex/react", () => ({
   useQuery: (_fn: unknown, args: unknown) => (args === "skip" ? undefined : status(args)),
   useMutation: () => mutation,
@@ -50,13 +50,13 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("el personaje se llama Wayra", () => {
-  it("la ficha, la instrucción y el audio al empezar dicen Wayra, nunca Kusi", () => {
+describe("el personaje se llama Robi", () => {
+  it("la ficha, la instrucción y el audio al empezar dicen Robi, nunca Kusi", () => {
     renderChallenge();
-    expect(screen.getByText(/Wayra quiere llegar a la estrella/)).toBeTruthy();
+    expect(screen.getByText(/Robi quiere llegar a la estrella/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Empezar el reto/ }));
-    expect(voice.speak).toHaveBeenCalledWith("Wayra quiere llegar a la estrella. ¡Está en línea recta!");
-    expect(screen.getAllByText(/Arma el programa para que Wayra llegue a la estrella/).length).toBeGreaterThan(0);
+    expect(voice.speak).toHaveBeenCalledWith("Robi quiere llegar a la estrella. ¡Está en línea recta!");
+    expect(screen.getAllByText(/Arma el programa para que Robi llegue a la estrella/).length).toBeGreaterThan(0);
     expect(document.body.textContent).not.toMatch(/Kusi/);
   });
 });
@@ -89,22 +89,22 @@ describe("pantalla del reto: Robot y Ejecutar", () => {
     expect(document.querySelector(".game.has-action-bar")).toBeNull();
   });
 
-  it("Wayra queda arriba a la derecha, junto al reto, con su botón de pista; el jardín es la tarjeta del tablero", () => {
+  it("Robi queda arriba a la derecha, junto al reto, con su botón de pista; el jardín es la tarjeta del tablero", () => {
     renderChallenge();
     fireEvent.click(screen.getByRole("button", { name: /Empezar el reto/ }));
     const row = document.querySelector(".goal-row") as HTMLElement;
     expect(within(row).getByRole("heading", { level: 1 })).toBeTruthy();
-    const wayra = within(within(row).getByRole("complementary", { name: /Wayra/ }));
-    expect(wayra.getByRole("button", { name: "Pista 0/3: pedir una pista" }).textContent).toBe(" Pista 0/3");
-    fireEvent.click(wayra.getByRole("button", { name: /pedir una pista/ }));
-    expect(wayra.getByRole("button", { name: /Pista 1\/3/ })).toBeTruthy();
+    const robi = within(within(row).getByRole("complementary", { name: /Robi/ }));
+    expect(robi.getByRole("button", { name: "Pista 0/3: pedir una pista" }).textContent).toBe(" Pista 0/3");
+    fireEvent.click(robi.getByRole("button", { name: /pedir una pista/ }));
+    expect(robi.getByRole("button", { name: /Pista 1\/3/ })).toBeTruthy();
     expect(within(screen.getByRole("complementary", { name: "Tablero" })).getByRole("heading", { level: 2 })).toBeTruthy();
   });
 
   it("con un robot conectado, Ejecutar también manda la secuencia al robot", async () => {
     window.localStorage.setItem("robolab.robot.transport", "wifi");
     window.localStorage.setItem(ROBOT_KEY, "K7Q4MZ");
-    status.mockReturnValue({ name: "Wayra-12", lastSeenAt: NOW - 1000, codeExpiresAt: NOW + 3_600_000, lastCommand: null });
+    status.mockReturnValue({ name: "Robi-12", lastSeenAt: NOW - 1000, codeExpiresAt: NOW + 3_600_000, lastCommand: null });
     renderChallenge();
     fireEvent.click(screen.getByRole("button", { name: /Empezar el reto/ }));
     fireEvent.click(screen.getByRole("button", { name: "Avanzar" }));
@@ -133,7 +133,7 @@ describe("pantalla del reto: al lograrlo", () => {
     for (let i = 0; i < 3; i++) fireEvent.click(screen.getByRole("button", { name: "Avanzar" }));
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Ejecutar/ }));
-      // La animación (4 pasos de 450 ms) y el momento de ver a Wayra en la estrella (1,2 s).
+      // La animación (4 pasos de 450 ms) y el momento de ver a Robi en la estrella (1,2 s).
       await vi.advanceTimersByTimeAsync(4000);
     });
     const title = screen.getByRole("heading", { level: 1, name: "¡Reto logrado!" });

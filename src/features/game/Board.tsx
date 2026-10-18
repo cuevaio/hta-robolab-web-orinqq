@@ -58,8 +58,8 @@ export function Board({ map, robot, mood, stepMs, onPick, picked, answer, topic 
       role={onPick ? "group" : "img"}
       aria-label={
         onPick
-          ? "Tablero: toca la casilla donde crees que termina Wayra."
-          : `Mapa de ${map.rows} por ${map.cols}. ${map.goal ? "Wayra debe llegar a la estrella." : ""}${map.stops.length ? ` Pasa por ${map.stops.length} banderas.` : ""}`
+          ? "Tablero: toca la casilla donde crees que termina Robi."
+          : `Mapa de ${map.rows} por ${map.cols}. ${map.goal ? "Robi debe llegar a la estrella." : ""}${map.stops.length ? ` Pasa por ${map.stops.length} banderas.` : ""}`
       }
     >
       {map.layout.flatMap((line, row) =>

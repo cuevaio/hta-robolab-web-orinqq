@@ -152,7 +152,7 @@ export function Sequence({
     <div className="stack-sm sequence" data-editable={readOnly ? undefined : true}>
       {/* El título visible de lo que se arma es «Tu programa» (ProgramHead); aquí solo nombra la lista. */}
       <span className={readOnly ? "editor-label" : "sr-only"} id={sequenceLabel}>
-        {readOnly ? "Programa de Wayra" : "Tu secuencia"}
+        {readOnly ? "Programa de Robi" : "Tu secuencia"}
       </span>
       <ul className="program" aria-labelledby={sequenceLabel} data-readonly={readOnly || undefined}>
         {state.blocks.map((block, i) => {

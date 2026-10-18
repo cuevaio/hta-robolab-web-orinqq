@@ -23,7 +23,7 @@ function start() {
   fireEvent.click(screen.getByRole("button", { name: /Empezar la misión/ }));
 }
 
-/** Lo que dice Wayra (el globo de la guía). */
+/** Lo que dice Robi (el globo de la guía). */
 const status = () => document.querySelector(".guide-bubble p")?.textContent;
 
 beforeEach(() => {

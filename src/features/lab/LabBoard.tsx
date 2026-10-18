@@ -57,7 +57,7 @@ export function LabBoard({ mission, robot, visited, mood, stepMs }: Props) {
     <div
       className="lab-board"
       role="img"
-      aria-label={`Tablero de ${mission.size} por ${mission.size} con ${mission.walls.length} paredes y ${mission.stations.length} estaciones. El terreno amarillo cuesta ${ROUGH_COST}. Wayra empieza ${placeOf(mission.start)} y debe terminar en la meta, ${placeOf(mission.goal)}.`}
+      aria-label={`Tablero de ${mission.size} por ${mission.size} con ${mission.walls.length} paredes y ${mission.stations.length} estaciones. El terreno amarillo cuesta ${ROUGH_COST}. Robi empieza ${placeOf(mission.start)} y debe terminar en la meta, ${placeOf(mission.goal)}.`}
       style={{ gridTemplateColumns: `repeat(${mission.size}, 1fr)`, ["--step-ms" as string]: `${stepMs}ms` }}
     >
       {rows.flatMap((row) =>

@@ -18,7 +18,7 @@ function fakeRelay(options: { busy?: boolean; states?: string[]; badCode?: boole
         : new Response(JSON.stringify({ estado: "EN_COLA", id: body.id }), { status: 200 });
     }
     const estado = url.includes("id=") ? (states.shift() ?? "DONE") : null;
-    return new Response(JSON.stringify({ estado, conectado: true, robot: "Wayra" }), { status: 200 });
+    return new Response(JSON.stringify({ estado, conectado: true, robot: "Robi" }), { status: 200 });
   });
   return { fetchImpl, calls };
 }
@@ -37,7 +37,7 @@ describe("adaptador WiFi (RobotLink del contrato)", () => {
     expect(link.transport).toBe("wifi");
 
     await link.connect();
-    expect(events).toContainEqual({ type: "state", state: "connected", message: "Wayra" });
+    expect(events).toContainEqual({ type: "state", state: "connected", message: "Robi" });
 
     await link.send("AADZAA");
     expect(relay.calls.find((c) => c.url.includes("enviar"))?.body).toMatchObject({ codigo: "sr965h", secuencia: "AADZAA" });

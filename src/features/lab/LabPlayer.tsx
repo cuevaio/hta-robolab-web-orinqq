@@ -143,7 +143,7 @@ function Intro({ mission, back, onStart }: { mission: Mission; back: Props["back
           Así empieza
         </span>
         <LabBoard mission={mission} robot={{ cell: mission.start, heading: headingAfter([]) }} mood="idle" stepMs={STEP_MS_MAX} />
-        <Guide message="¡Hola! Soy Wayra. Elige tu nivel y arma la ruta con flechas. Si te trabas, pídeme una pista." />
+        <Guide message="¡Hola! Soy Robi. Elige tu nivel y arma la ruta con flechas. Si te trabas, pídeme una pista." />
       </section>
     </div>
   );

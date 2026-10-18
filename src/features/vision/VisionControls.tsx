@@ -66,7 +66,7 @@ export function VisionControls(props: Props) {
           if (latest.current.canConfirm) {
             // Cierra la entrada antes de que React pinte el estado de ejecución.
             latest.current = { ...latest.current, disabled: true };
-            setMessage("Programa confirmado. Mira cómo se mueve Wayra.");
+            setMessage("Programa confirmado. Mira cómo se mueve Robi.");
             latest.current.onConfirm();
           } else {
             setMessage("Primero agrega un bloque a tu programa.");
@@ -107,7 +107,7 @@ export function VisionControls(props: Props) {
   useEffect(() => onCandidate?.(seen), [seen, onCandidate]);
 
   const currentGesture = GESTURES.find((gesture) => gesture.action === feedback.candidate);
-  const instruction = props.disabled ? "Espera a que Wayra termine."
+  const instruction = props.disabled ? "Espera a que Robi termine."
     : feedback.releaseRequired ? "Retira la mano entre cada gesto."
       : currentGesture ? `${currentGesture.prompt} y espera a llenar la barra.`
         : "Apunta con el índice en una dirección.";

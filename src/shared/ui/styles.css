@@ -1314,7 +1314,7 @@ textarea.input {
 }
 
 /*
- * El juego: a la derecha (arriba en el celular) el reto con Wayra, el jardín y la
+ * El juego: a la derecha (arriba en el celular) el reto con Robi, el jardín y la
  * cámara; a la izquierda el espacio de trabajo (programa, papelera, Ejecutar y piezas).
  */
 .game {
@@ -1368,7 +1368,7 @@ textarea.input {
   box-shadow: none;
 }
 
-.wayra-card {
+.robi-card {
   display: grid;
   gap: 6px;
   justify-items: center;
