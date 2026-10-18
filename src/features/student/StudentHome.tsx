@@ -7,7 +7,6 @@ import { usePageTitle } from "../../shared/usePageTitle";
 import { ExploreLayout, LEVEL_INFO } from "../explore/ExploreLayout";
 import { emojiFor, kindLabel } from "../explore/catalog";
 import { warmUpRecognizer } from "../vision/recognizer";
-import { speak } from "./speech";
 import "./join.css";
 
 type Props = { token: string; onSignOut: () => void };
@@ -20,10 +19,6 @@ export function StudentHome({ token, onSignOut }: Props) {
   const navigate = useNavigate();
 
   const challenges = home?.classChallenges ?? [];
-  const name = home?.displayName;
-  useEffect(() => {
-    if (name) speak(`¡Hola, ${name}!`);
-  }, [name]);
   // Si tiene retos de Inicial, el modelo de gestos se baja desde ya, antes de abrir el reto.
   const hasInicial = challenges.some((c) => c.level === "inicial");
   useEffect(() => {

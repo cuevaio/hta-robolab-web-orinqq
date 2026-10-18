@@ -25,7 +25,7 @@ import { RobotSend } from "../robot/RobotSend";
 import { useRobotLink, type RobotSync } from "../robot/useRobotLink";
 import { STEP_MS, useRunner } from "../game/useRunner";
 import { useStudentToken } from "../student/session";
-import { speak } from "../student/speech";
+import { playSound, shouldStepSound } from "../../shared/sound/sounds";
 import { ChallengeDone } from "./ChallengeDone";
 import { Breadcrumbs, ExploreLayout, LEVEL_INFO } from "./ExploreLayout";
 import { deviceId, useExploreProgress } from "./storage";
@@ -36,8 +36,8 @@ type Stats = { readonly runs: number; readonly hints: number; readonly ms: numbe
 type Submission = { readonly program?: Program; readonly pick?: Cell };
 
 const INSTRUCTION: Record<Challenge["kind"], string> = {
-  sequence: "Arma el programa para que Wayra llegue a la estrella.",
-  predict: "Lee el programa y toca la casilla donde terminará Wayra.",
+  sequence: "Arma el programa para que Robi llegue a la estrella.",
+  predict: "Lee el programa y toca la casilla donde terminará Robi.",
   fix: "Este programa tiene un error. Quita o cambia bloques para arreglarlo.",
   stops: "Pasa por todas las banderas 🚩 y después llega a la estrella.",
   efficient: "Llega a la estrella usando pocos bloques.",
@@ -110,7 +110,7 @@ function Intro({ challenge, onStart }: { challenge: Challenge; onStart: () => vo
           stepMs={STEP_MS}
           topic={challenge.topic}
         />
-        <Guide message={`¡Hola! Soy Wayra. Si te trabas, pídeme una pista: tienes 3.`} />
+        <Guide message={`¡Hola! Soy Robi. Si te trabas, pídeme una pista: tienes 3.`} />
       </section>
     </div>
   );
@@ -136,38 +136,47 @@ function Play({ challenge, robot, onSolved }: { challenge: Challenge; robot: Rob
 
   const say = (mood: Mood, message: string) => {
     setGuide({ mood, message });
-    if (challenge.level === "inicial") speak(message);
   };
 
   const finish = (submission: Submission) => {
     setSolved(true);
-    // Un momento para ver a Wayra en la estrella antes de pasar al resultado.
+    // Un momento para ver a Robi en la estrella antes de pasar al resultado.
     window.setTimeout(() => onSolved({ runs: Math.max(runs, 1), hints, ms: Date.now() - startedAt }, submission), 1200);
   };
 
-  const { state: runner, run, reset } = useRunner(challenge.map, () => {
-    if (challenge.kind === "predict") {
-      setBoardMood("success");
-      finish({ pick: picked ?? challenge.map.start });
-      return;
-    }
-    const { result } = checkProgram(challenge, ranProgram.current);
-    if (result.ok) {
-      setBoardMood("success");
-      say("happy", result.message);
-      finish({ program: ranProgram.current });
-    } else {
-      setBoardMood(result.reason === "OFF_PATH" ? "error" : "idle");
-      say(MOOD_FOR[result.reason], result.message);
-    }
-  });
+  const { state: runner, run, reset } = useRunner(
+    challenge.map,
+    () => {
+      if (challenge.kind === "predict") {
+        setBoardMood("success");
+        playSound("win");
+        finish({ pick: picked ?? challenge.map.start });
+        return;
+      }
+      const { result } = checkProgram(challenge, ranProgram.current);
+      if (result.ok) {
+        setBoardMood("success");
+        playSound("win");
+        say("happy", result.message);
+        finish({ program: ranProgram.current });
+      } else {
+        setBoardMood(result.reason === "OFF_PATH" ? "error" : "idle");
+        playSound("oops");
+        say(MOOD_FOR[result.reason], result.message);
+      }
+    },
+    (index, total) => {
+      if (shouldStepSound(index, total)) playSound("step");
+    },
+  );
 
   function execute() {
     if (runner.running || solved || robot.busy || editor.blocks.length === 0) return;
     ranProgram.current = editor.blocks;
+    playSound("play");
     setRuns((n) => n + 1);
     setBoardMood("idle");
-    setGuide({ mood: "thinking", message: "Mira cómo se mueve Wayra…" });
+    setGuide({ mood: "thinking", message: "Mira cómo se mueve Robi…" });
     run(editor.blocks);
     // Si hay un robot conectado, hace el mismo recorrido.
     if (robot.state === "on") void robot.send(editor.blocks);
@@ -181,6 +190,7 @@ function Play({ challenge, robot, onSolved }: { challenge: Challenge; robot: Rob
       say("happy", `${result.message} Mira cómo llega.`);
       run(challenge.given);
     } else {
+      playSound("oops");
       say(MOOD_FOR[result.reason], runs >= 1 && hints === 0 ? `${result.message} Puedes pedirme una pista.` : result.message);
     }
   }
@@ -236,7 +246,7 @@ function Play({ challenge, robot, onSolved }: { challenge: Challenge; robot: Rob
               </span>
             </div>
           </section>
-          <aside className="wayra-card card" aria-label="Wayra, tu guía">
+          <aside className="robi-card card" aria-label="Robi, tu guía">
             <GuideAvatar mood={guide.mood} size={56} />
             <button
               className="btn btn-sm"
@@ -354,7 +364,6 @@ function ChallengePage({ challenge }: { challenge: Challenge }) {
           challenge={challenge}
           onStart={() => {
             setPhase("play");
-            if (challenge.level === "inicial") speak(challenge.story);
           }}
         />
       )}

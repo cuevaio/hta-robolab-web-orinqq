@@ -75,12 +75,12 @@ describe("sincronizar con robot (wifi)", () => {
 
   it("si el robot dio señal hace poco: 'Robot conectado', botón Robot OK y se puede enviar la secuencia", () => {
     window.localStorage.setItem(ROBOT_KEY, "K7Q4MZ");
-    status.mockReturnValue({ name: "Wayra-12", lastSeenAt: NOW - 1000, codeExpiresAt: NOW + 3_600_000, lastCommand: null });
+    status.mockReturnValue({ name: "Robi-12", lastSeenAt: NOW - 1000, codeExpiresAt: NOW + 3_600_000, lastCommand: null });
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: /Robot OK/ }));
     const sheet = screen.getByRole("dialog");
     expect(within(sheet).getByRole("status").textContent).toBe("Robot conectado");
-    expect(within(sheet).getByText("Wayra-12")).toBeTruthy();
+    expect(within(sheet).getByText("Robi-12")).toBeTruthy();
     expect((within(sheet).getByRole("button", { name: "Enviar al robot" }) as HTMLButtonElement).disabled).toBe(false);
 
     fireEvent.click(within(sheet).getByRole("button", { name: "Robot OK" }));
@@ -89,7 +89,7 @@ describe("sincronizar con robot (wifi)", () => {
 
   it("si el robot lleva más de 10 s sin dar señal vuelve a 'Robot sin conectar' y explica qué revisar", () => {
     window.localStorage.setItem(ROBOT_KEY, "K7Q4MZ");
-    status.mockReturnValue({ name: "Wayra-12", lastSeenAt: NOW - 60_000, codeExpiresAt: NOW + 3_600_000, lastCommand: null });
+    status.mockReturnValue({ name: "Robi-12", lastSeenAt: NOW - 60_000, codeExpiresAt: NOW + 3_600_000, lastCommand: null });
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: /Robot/ }));
     const sheet = screen.getByRole("dialog");
@@ -119,10 +119,28 @@ describe("sincronizar con robot (Bluetooth Classic)", () => {
     const sheet = within(screen.getByRole("dialog"));
     expect(sheet.getByRole("button", { name: "Bluetooth" }).getAttribute("aria-pressed")).toBe("true");
     expect(sheet.queryByLabelText("Código del robot")).toBeNull();
-    expect(sheet.getByText(/Chrome.*laptop/)).toBeTruthy();
+    expect(sheet.getByText(/Chrome o Edge.*computadora/)).toBeTruthy();
     expect((sheet.getByRole("button", { name: "Elegir robot" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(sheet.getByRole("button", { name: "Wifi" }));
     expect(sheet.getByLabelText("Código del robot")).toBeTruthy();
+  });
+
+  it("explica cómo recuperar Bluetooth y conserva el error original para diagnosticarlo", async () => {
+    const port = {
+      readable: null, writable: null,
+      open: async () => { throw new DOMException("Failed to open serial port.", "NetworkError"); },
+      close: async () => {},
+    };
+    Object.defineProperty(navigator, "serial", { configurable: true, value: { requestPort: async () => port } });
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: /Sincronizar con robot/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Elegir robot" }));
+    const sheet = within(screen.getByRole("dialog"));
+    await waitFor(() => expect(sheet.getByRole("alert").textContent).toMatch(/encendido y cerca/));
+    expect(sheet.getByText("Detalles de conexión")).toBeTruthy();
+    expect(sheet.getByText(/Al abrir el puerto.*NetworkError/)).toBeTruthy();
+    expect(sheet.getByText("Failed to open serial port.")).toBeTruthy();
+    expect((sheet.getByRole("button", { name: "Elegir robot" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("mantiene el enlace al cerrar la hoja, muestra capacidades reales y permite parar fuera de ella", async () => {

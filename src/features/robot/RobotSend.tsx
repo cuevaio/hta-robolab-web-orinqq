@@ -30,7 +30,7 @@ const CHIP: Record<SyncState, string> = { off: "Robot sin conectar", searching: 
 const BUTTON: Record<SyncState, string> = { off: "Robot", searching: "Buscando…", on: "Robot OK" };
 
 const WIFI_STEPS = ["Enciende el robot", "Mira su código en la pantalla o en el monitor", "Escríbelo aquí"];
-const BLUETOOTH_STEPS = ["Enciende el robot", "Empareja RoboLab en los ajustes Bluetooth de tu laptop", "Toca «Elegir robot» y selecciona su puerto"];
+const BLUETOOTH_STEPS = ["Enciende el robot", "Empareja RoboLab una vez en los ajustes Bluetooth de tu computadora", "Vuelve aquí: toca «Elegir robot» y selecciona RoboLab"];
 
 /** `showModal` atrapa el foco y bloquea el fondo; donde no existe (navegadores viejos) se abre sin modal. */
 function openDialog(dialog: HTMLDialogElement) {
@@ -125,12 +125,14 @@ export function RobotSend({ robot, program, disabled }: Props) {
 }
 
 const BLUETOOTH_STEP = { sending: "Enviando programa…", received: "El robot recibió el programa.", running: "El robot lo está haciendo…", done: "¡El robot terminó!", failed: "El programa se detuvo." };
+const CONNECTION_STAGE = { select: "Al elegir el robot", open: "Al abrir el puerto", handshake: "Al confirmar la conexión" };
 
 function BluetoothBody({ robot, program, disabled, onDone }: Props & { onDone: () => void }) {
   const problem = robot.programProblem(program);
   const last = robot.bluetooth.last;
+  const diagnostic = robot.bluetooth.diagnostic;
   return <div className="stack">
-    {!robot.supported && <p className="hint">Abre RoboLab en Chrome de laptop por HTTPS o localhost para usar Bluetooth Classic. También puedes conectar por Wifi.</p>}
+    {!robot.supported && <p className="hint">Bluetooth Classic necesita Chrome o Edge en computadora con HTTPS o localhost. También puedes conectar por Wifi.</p>}
     {robot.state !== "on" ? <div className="row sheet-actions">
       <button className="btn" type="button" onClick={() => { void robot.disconnect(); onDone(); }}>Cancelar</button>
       <button className="btn btn-primary" type="button" disabled={!robot.supported || robot.state === "searching"} onClick={() => void robot.connect()}>
@@ -148,6 +150,11 @@ function BluetoothBody({ robot, program, disabled, onDone }: Props & { onDone: (
       <button className="link-btn small" type="button" onClick={() => void robot.disconnect()}>Desconectar robot</button>
     </>}
     {robot.error && <p className="alert alert-error" role="alert">{robot.error}</p>}
+    {robot.error && diagnostic && <details className="small">
+      <summary>Detalles de conexión</summary>
+      <p>{CONNECTION_STAGE[diagnostic.stage]} · {diagnostic.name}</p>
+      <p>{diagnostic.message}</p>
+    </details>}
   </div>;
 }
 

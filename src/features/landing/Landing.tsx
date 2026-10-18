@@ -18,7 +18,7 @@ export function Landing() {
           </h1>
           <p className="muted">Ciencia, tecnología, ingeniería, artes y matemáticas. Sin registrarte: elige un tópico y empieza.</p>
         </div>
-        <div className="topic-grid">
+        <div className="steam-grid">
           {TOPICS.map((t) => (
             <TopicCard key={t.id} topic={t} progress={topicProgress(progress, t.id)} />
           ))}

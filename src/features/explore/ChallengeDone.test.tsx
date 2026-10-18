@@ -63,9 +63,9 @@ describe("¡Reto logrado! (M6)", () => {
     expect(screen.getByRole("button", { name: /Repetir/ })).toBeTruthy();
   });
 
-  it("Wayra felicita; sin pistas lo destaca", () => {
+  it("Robi felicita; sin pistas lo destaca", () => {
     renderDone("inicial-paseo");
-    expect(screen.getByRole("complementary", { name: /Wayra/ })).toBeTruthy();
+    expect(screen.getByRole("complementary", { name: /Robi/ })).toBeTruthy();
     expect(screen.getByText("¡Sin pistas! ¡Qué buen trabajo!")).toBeTruthy();
   });
 });

@@ -1,4 +1,4 @@
-/* Wayra, la guía: asistente flotante en la esquina inferior derecha. */
+/* Robi, la guía: asistente flotante en la esquina inferior derecha. */
 .guide {
   position: fixed;
   right: max(16px, env(safe-area-inset-right));
@@ -79,7 +79,7 @@
   white-space: nowrap;
 }
 
-/* Que Wayra no tape el final de la página: queda espacio para llegar a todo. */
+/* Que Robi no tape el final de la página: queda espacio para llegar a todo. */
 body:has(.guide) .explore-main,
 body:has(.guide) .page {
   padding-bottom: 160px;
@@ -102,7 +102,7 @@ body:has(.guide) .page {
     font-size: 0.9rem;
   }
 
-  /* En las pantallas con barra inferior (Robot, Ejecutar) Wayra queda por encima de ella. */
+  /* En las pantallas con barra inferior (Robot, Ejecutar) Robi queda por encima de ella. */
   .has-action-bar .guide {
     bottom: calc(88px + env(safe-area-inset-bottom));
   }

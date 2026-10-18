@@ -64,6 +64,12 @@ describe("inicio del docente (T2)", () => {
     expect((available.getByRole("link", { name: "El reparto" }) as HTMLAnchorElement).getAttribute("href")).toBe("/reto/primaria-ciencia-reparto");
   });
 
+  it("ya no ofrece «Crear misión multigrado»: las misiones nuevas se crean desde Retos", () => {
+    renderHome();
+    expect(screen.queryByText(/multigrado/i)).toBeNull();
+    expect(document.querySelector('a[href="/docente/laboratorio/nueva"]')).toBeNull();
+  });
+
   it("Mis clases lista cada clase con su código y ofrece «Nueva clase»", () => {
     renderHome();
     const classes = within(screen.getByRole("heading", { name: "Mis clases" }).closest("section")!);

@@ -20,14 +20,14 @@ afterEach(() => {
   delete window.matchMedia;
 });
 
-describe("Wayra, asistente flotante", () => {
+describe("Robi, asistente flotante", () => {
   it("es un complemento de la página con su mensaje anunciado y el botón de pista adentro", () => {
     render(
       <Guide message="Pista 1: avanza.">
         <button type="button">Pedir pista</button>
       </Guide>,
     );
-    const guide = screen.getByRole("complementary", { name: "Wayra, tu guía" });
+    const guide = screen.getByRole("complementary", { name: "Robi, tu guía" });
     expect(guide.classList.contains("guide")).toBe(true);
     expect(screen.getByRole("status").textContent).toBe("Pista 1: avanza.");
     expect(screen.getByRole("button", { name: "Pedir pista" })).toBeTruthy();
@@ -39,11 +39,11 @@ describe("Wayra, asistente flotante", () => {
         <button type="button">Pedir pista</button>
       </Guide>,
     );
-    const face = screen.getByRole("button", { name: "Esconder el mensaje de Wayra" });
+    const face = screen.getByRole("button", { name: "Esconder el mensaje de Robi" });
     expect(face.getAttribute("aria-expanded")).toBe("true");
     fireEvent.click(face);
 
-    const shown = screen.getByRole("button", { name: "Mostrar el mensaje de Wayra" });
+    const shown = screen.getByRole("button", { name: "Mostrar el mensaje de Robi" });
     expect(shown.getAttribute("aria-expanded")).toBe("false");
     expect(screen.getByRole("complementary").getAttribute("data-folded")).toBe("true");
     // El botón de pista no queda invisible pero enfocable.
@@ -54,9 +54,9 @@ describe("Wayra, asistente flotante", () => {
     expect(screen.getByRole("button", { name: "Pedir pista" })).toBeTruthy();
   });
 
-  it("si Wayra dice algo nuevo, el globo vuelve a abrirse", () => {
+  it("si Robi dice algo nuevo, el globo vuelve a abrirse", () => {
     const { rerender } = render(<Guide message="Uno" />);
-    fireEvent.click(screen.getByRole("button", { name: "Esconder el mensaje de Wayra" }));
+    fireEvent.click(screen.getByRole("button", { name: "Esconder el mensaje de Robi" }));
     expect(screen.getByRole("complementary").getAttribute("data-folded")).toBe("true");
     rerender(<Guide message="Dos" />);
     expect(screen.getByRole("complementary").getAttribute("data-folded")).toBeNull();
@@ -64,7 +64,7 @@ describe("Wayra, asistente flotante", () => {
   });
 });
 
-describe("Wayra en el celular", () => {
+describe("Robi en el celular", () => {
   it("el globo se esconde solo a los 10 s para no tapar el juego, y volver a tocarla lo abre", () => {
     vi.useFakeTimers();
     pretendViewport(true);
@@ -82,7 +82,7 @@ describe("Wayra en el celular", () => {
     // El mensaje sigue ahí para el lector de pantalla.
     expect(screen.getByRole("status").textContent).toBe("Arma el programa");
 
-    fireEvent.click(screen.getByRole("button", { name: "Mostrar el mensaje de Wayra" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mostrar el mensaje de Robi" }));
     expect(screen.getByRole("complementary").getAttribute("data-folded")).toBeNull();
   });
 

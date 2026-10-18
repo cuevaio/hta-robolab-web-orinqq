@@ -5,7 +5,7 @@ Retos de programación con un robot, para Inicial y Primaria, en dos modos:
 - **Explorar retos (sin cuenta).** Cualquiera entra, elige un tópico y un
   nivel y resuelve retos de pensamiento computacional: armar la secuencia,
   esquivar obstáculos, predecir dónde termina el robot, corregir un programa
-  con error, pasar por paradas y resolver con pocos bloques. Wayra, la guía,
+  con error, pasar por paradas y resolver con pocos bloques. Robi, la guía,
   reacciona a cada intento y da hasta 3 pistas. El avance se guarda en el
   dispositivo.
 - **Clases.** Cada clase tiene un código (como `TEC-482`): el alumno se une con
@@ -37,7 +37,7 @@ aquí como el paquete npm `@robolab/backend`.
   laboratorio (Ciencia), el taller (Ingeniería), la galería (Artes) y los números
   (Matemáticas).
 - Cada reto tiene una ficha (historia, tiempo, habilidad, vista previa del
-  tablero), el juego con Wayra y sus pistas, y "¡Reto logrado!" con intentos,
+  tablero), el juego con Robi y sus pistas, y "¡Reto logrado!" con intentos,
   pistas y tiempo.
 - "Mi avance" muestra lo resuelto por tópico en ese dispositivo.
 - Cada partida resuelta se registra de forma anónima (un identificador al azar
@@ -89,7 +89,7 @@ derecha y el pulgar para ejecutar) y la cámara se enciende sola debajo del
 jardín; permite el acceso y muestra una sola mano. Con Botones, las piezas son
 flechas y la cámara se apaga. Si la cámara no se puede encender, vuelve a
 Botones y lo avisa. Los dos modos arman el mismo programa. La papelera y
-**Ejecutar** van dentro del cuadro del programa, y Wayra (con las pistas) junto
+**Ejecutar** van dentro del cuadro del programa, y Robi (con las pistas) junto
 al reto:
 
 | Gesto | Acción |
@@ -104,14 +104,14 @@ Mantén el gesto hasta llenar la barra (0,8 segundos para bloques; 1,2 para
 confirmar); la pieza del gesto que la cámara ve se resalta en la bandeja. Retira la mano durante al menos 0,4 segundos entre gestos, también
 para repetir el mismo bloque. Puedes quitar un bloque tocándolo, borrar el
 programa o cambiar a Botones sin perder la secuencia. Un programa vacío no
-se ejecuta y la entrada queda en pausa mientras Wayra se mueve.
+se ejecuta y la entrada queda en pausa mientras Robi se mueve.
 
 Usa el índice extendido con los otros dedos recogidos. Las cuatro direcciones
 se calculan con los puntos de la mano de MediaPipe y coinciden con la vista en
 espejo; no dependen de los gestos «Victoria» o «Te quiero». Una dirección
 diagonal o un dedo apuntando hacia la cámara no agrega bloques. Las órdenes
 siguen siendo relativas al robot: arriba agrega Avanzar, abajo Retroceder y
-los lados agregan un giro, cualquiera sea la orientación actual de Wayra.
+los lados agregan un giro, cualquiera sea la orientación actual de Robi.
 
 Retroceder en Inicial requiere el cambio compartido del
 [PR del backend #6](https://github.com/orinqq/robolab-backend/pull/6).
@@ -227,8 +227,9 @@ wifi para recibir los movimientos. El modo **Wifi** conserva la conexión por c�
 
 1. Cargar el sketch completo `firmware/robi/robi.ino` del backend. Incluye los
    motores, ojos, luces y sonidos en un solo archivo; no necesita copiar `.h`.
-2. Emparejar **RoboLab** en los ajustes Bluetooth de la laptop.
-3. Abrir la web por HTTPS o localhost en Chrome de escritorio (117 o superior).
+2. Emparejar **RoboLab** una vez en los ajustes Bluetooth de la computadora.
+   Puede quedar como desconectado en Ubuntu: el puerto se abre desde la web.
+3. Abrir la web por HTTPS o localhost en Chrome o Edge de escritorio actualizado.
 4. En el reto, tocar **Robot → Elegir robot** y seleccionar su puerto Bluetooth.
    El chip solo cambia a conectado después de que responde el firmware.
 
@@ -246,7 +247,20 @@ El contrato, pines y pruebas de aceptación están en
 [robot-bluetooth.md del backend](https://github.com/orinqq/robolab-backend/blob/main/docs/robot-bluetooth.md).
 El lockfile fija el commit del backend oficial por `git+https`.
 La API requiere un navegador con Web Serial;
-si no está disponible, se muestra la alternativa Wifi.
+si no está disponible, se muestra la alternativa Wifi. Firefox y Zen no ofrecen
+esta conexión Bluetooth Classic de forma nativa.
+
+Al volver a conectar, la web espera que termine de cerrarse el puerto anterior,
+también al cambiar de reto. Usa el robot en una sola pestaña o navegador a la vez.
+Si falla, **Detalles de conexión** conserva la etapa y el error del navegador.
+Comprueba que RoboLab esté encendido y cerca, desconéctalo de otros equipos y
+reinícialo. En Ubuntu, si tampoco aparece al buscar dispositivos y el sistema
+informa `Host is down` o `br-connection-page-timeout`, hay que recuperar primero
+el enlace Bluetooth del sistema. Las advertencias `Serial blocklist` sobre
+servicios de audio de otros dispositivos no indican un fallo del puerto SPP de RoboLab.
+
+Referencias: [Bluetooth RFCOMM con Web Serial](https://developer.chrome.com/blog/serial-over-bluetooth)
+y [compatibilidad de Web Serial](https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API).
 
 ## Pruebas y calidad
 
@@ -291,7 +305,7 @@ ssh y el repo del backend es público.
 ## Créditos
 
 Los gráficos del robot y de los bloques vienen del kit Inrobit que el equipo
-hizo en 2025. Wayra se dibuja con [blobatar](https://github.com/Alain00/blobatar)
+hizo en 2025. Robi se dibuja con [blobatar](https://github.com/Alain00/blobatar)
 (MIT), en el navegador y sin conexión a terceros. Todo el código de esta
 aplicación es nuevo.
 

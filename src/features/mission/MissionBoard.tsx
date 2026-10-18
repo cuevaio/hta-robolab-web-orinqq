@@ -39,7 +39,7 @@ export function MissionBoard({ mission, state }: Props) {
       className="mb"
       style={{ ["--cols" as string]: cols, ["--rows" as string]: rows, ["--r" as string]: state.position.row, ["--c" as string]: state.position.col, ["--heading" as string]: `${state.heading}deg` }}
       role="img"
-      aria-label={`Tablero de ${rows} por ${cols}. Kusi está en la fila ${state.position.row + 1}, columna ${state.position.col + 1}, mirando ${HEADING_WORD[state.heading] ?? "adelante"}.${stationsLeft > 0 ? ` Faltan ${stationsLeft} ${stationsLeft === 1 ? "estación" : "estaciones"}.` : ""}`}
+      aria-label={`Tablero de ${rows} por ${cols}. Robi está en la fila ${state.position.row + 1}, columna ${state.position.col + 1}, mirando ${HEADING_WORD[state.heading] ?? "adelante"}.${stationsLeft > 0 ? ` Faltan ${stationsLeft} ${stationsLeft === 1 ? "estación" : "estaciones"}.` : ""}`}
     >
       <div className="mb-grid">{grid}</div>
       <span className="mb-robot" aria-hidden="true">

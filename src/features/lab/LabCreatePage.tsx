@@ -32,7 +32,7 @@ export function LabCreatePage() {
   const mine = useQuery(api.lab.listMine);
   const navigate = useNavigate();
   const toast = useToast();
-  useDocumentTitle("Crear misión multigrado");
+  useDocumentTitle("Crear misión");
 
   const check = mission ? validate(mission) : null;
   const promptOk = prompt.trim().length > 0;

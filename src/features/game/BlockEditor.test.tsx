@@ -5,7 +5,54 @@ import { move } from "@robolab/backend/domain/game/program";
 import { policyFor } from "@robolab/backend/domain/game/levels";
 import { BlockEditor, PieceTray } from "./BlockEditor";
 
-afterEach(cleanup);
+const sound = vi.hoisted(() => ({ playSound: vi.fn() }));
+const voice = vi.hoisted(() => ({ speak: vi.fn() }));
+// La app no usa voz sintética: si algo llamara a la del navegador, estas pruebas lo verían.
+vi.stubGlobal("speechSynthesis", { speak: voice.speak, cancel: vi.fn(), getVoices: () => [] });
+vi.stubGlobal("SpeechSynthesisUtterance", class {});
+vi.mock("../../shared/sound/sounds", () => ({ playSound: sound.playSound, shouldStepSound: () => true }));
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+describe("sonidos del editor, sin voz", () => {
+  const state = { blocks: [move("FORWARD"), move("TURN_LEFT")], openRepeat: null };
+  const editor = (dispatch = vi.fn()) => {
+    render(<BlockEditor policy={policyFor("primaria")} state={state} dispatch={dispatch} disabled={false} />);
+    return dispatch;
+  };
+
+  it("poner una pieza hace «plop» y NO dice su nombre en voz alta", () => {
+    editor();
+    fireEvent.click(within(screen.getByRole("group", { name: "Piezas" })).getByRole("button", { name: "Girar a la derecha" }));
+    expect(sound.playSound).toHaveBeenCalledWith("place");
+    expect(voice.speak).not.toHaveBeenCalled();
+  });
+
+  it("Repetir también hace «plop»", () => {
+    editor();
+    fireEvent.click(within(screen.getByRole("group", { name: "Piezas" })).getByRole("button", { name: "Repetir" }));
+    expect(sound.playSound).toHaveBeenCalledWith("place");
+  });
+
+  it("quitar un paso, o borrar todo, hace el sonido de quitar", () => {
+    editor();
+    fireEvent.click(screen.getByRole("button", { name: /Paso 1: Avanzar/ }));
+    expect(sound.playSound).toHaveBeenLastCalledWith("remove");
+    sound.playSound.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Borrar la secuencia" }));
+    expect(sound.playSound).toHaveBeenCalledWith("remove");
+    expect(voice.speak).not.toHaveBeenCalled();
+  });
+
+  it("con las piezas bloqueadas (mientras corre) no suena nada", () => {
+    render(<BlockEditor policy={policyFor("primaria")} state={state} dispatch={vi.fn()} disabled />);
+    fireEvent.click(within(screen.getByRole("group", { name: "Piezas" })).getByRole("button", { name: "Avanzar" }));
+    expect(sound.playSound).not.toHaveBeenCalled();
+  });
+});
 
 describe("editor de bloques", () => {
   it("la secuencia es una lista real: cada paso es un <li> con su botón para quitarlo", () => {

@@ -26,9 +26,6 @@ export function HomePage() {
         <h1 className="home-greeting" style={{ margin: 0 }}>
           {home?.firstName ? `Hola, ${home.firstName}` : "Hola"}
         </h1>
-        <Link className="btn" to="/docente/laboratorio/nueva">
-          <Icon name="plus" /> Crear misión multigrado
-        </Link>
       </div>
 
       <div className="stat-grid" role="group" aria-label="Resumen">

@@ -2,6 +2,8 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { missionFixtures } from "@robolab/backend/domain/mission/fixtures";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+const sound = vi.hoisted(() => ({ playSound: vi.fn() }));
+vi.mock("../../shared/sound/sounds", () => ({ playSound: sound.playSound, shouldStepSound: () => true }));
 import { STEP_MS, MissionPlayer } from "./MissionPlayer";
 
 // «Lleva los libros»: una fila de 4 casillas; avanzar 3 veces llega a la meta con los 3 de energía.
@@ -9,7 +11,10 @@ const MISSION = missionFixtures.find((m) => m.grade === 2)!;
 // «Visita la biblioteca»: una estación obligatoria y un terreno que cuesta 3.
 const WITH_STATION = missionFixtures.find((m) => m.grade === 3)!;
 
-beforeEach(() => vi.useFakeTimers());
+beforeEach(() => {
+  vi.useFakeTimers();
+  sound.playSound.mockClear();
+});
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
@@ -25,7 +30,7 @@ describe("jugar una misión del asistente", () => {
   it("muestra la consigna, el tablero, la energía y la bandeja de piezas de siempre", () => {
     render(<MissionPlayer mission={MISSION} />);
     expect(screen.getByRole("heading", { level: 1, name: "Lleva los libros." })).toBeTruthy();
-    expect(board()).toMatch(/Tablero de 1 por 4\. Kusi está en la fila 1, columna 1, mirando a la derecha\./);
+    expect(board()).toMatch(/Tablero de 1 por 4\. Robi está en la fila 1, columna 1, mirando a la derecha\./);
     expect(screen.getByText(/Energía: 3 de 3/)).toBeTruthy();
     expect(within(screen.getByRole("group", { name: "Piezas" })).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
       "Avanzar",
@@ -41,7 +46,7 @@ describe("jugar una misión del asistente", () => {
     render(<MissionPlayer mission={MISSION} onSolved={onSolved} />);
     for (let i = 0; i < 3; i++) piece("Avanzar");
     run();
-    expect(status()).toMatch(/Mira cómo se mueve Kusi/);
+    expect(status()).toMatch(/Mira cómo se mueve Robi/);
     play(STEP_MS);
     expect(board()).toMatch(/columna 2/);
     expect(screen.getByText(/Energía: 2 de 3/)).toBeTruthy();
@@ -108,6 +113,27 @@ describe("jugar una misión del asistente", () => {
     run();
     play(STEP_MS * 5);
     expect(screen.getByRole("heading", { name: "¡Misión lograda!" })).toBeTruthy();
+  });
+
+  it("suena: «bip-bip» al ejecutar, un «tup» por paso y la melodía al llegar", () => {
+    render(<MissionPlayer mission={MISSION} />);
+    for (let i = 0; i < 3; i++) piece("Avanzar");
+    run();
+    play(STEP_MS * 5);
+    const names = sound.playSound.mock.calls.map((c) => c[0]);
+    expect(names.filter((n) => n === "place")).toHaveLength(3);
+    expect(names.slice(3)).toEqual(["play", "step", "step", "step", "win"]);
+  });
+
+  it("si no llega, suena el «boop» amable, no la melodía", () => {
+    render(<MissionPlayer mission={MISSION} />);
+    piece("Girar a la izquierda");
+    piece("Avanzar");
+    run();
+    play(STEP_MS * 4);
+    const names = sound.playSound.mock.calls.map((c) => c[0]);
+    expect(names).toContain("oops");
+    expect(names).not.toContain("win");
   });
 
   it("al salir de la pantalla a mitad del recorrido no deja temporizadores sueltos", () => {

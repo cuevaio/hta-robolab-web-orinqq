@@ -1,33 +1,51 @@
 import { Link } from "react-router-dom";
-import type { TopicInfo } from "@robolab/backend/domain/explore/challenges";
+import type { Topic, TopicInfo } from "@robolab/backend/domain/explore/challenges";
 import type { ProgressSummary } from "@robolab/backend/domain/explore/progress";
-import { Icon } from "../../shared/ui/Icon";
-import { TOPIC_COLOR } from "./ExploreLayout";
 import { ProgressChip } from "./ProgressChip";
-import "./explore-topics.css";
+import "./steam-cards.css";
 
-/** La tarjeta de un tópico en la portada (S1) y en la lista del celular (M1), con su avance. */
+/** La letra de STEAM de cada tópico: S de Ciencia, T de Tecnología, E de Ingeniería, A de Artes, M de Matemáticas. */
+const LETTER: Record<Topic, string> = { ciencia: "S", tecnologia: "T", ingenieria: "E", artes: "A", matematicas: "M" };
+
+/** Los adornos de la escena de cada tópico (solo decoración): emojis y texto; su lugar lo da el CSS (`.d1`, `.d2`…). */
+const DECO: Record<Topic, readonly string[]> = {
+  ciencia: ["🧪", "⚛\uFE0E", "🔬", "✨", "✨", "🫧"],
+  tecnologia: ["</>", "📶", "0101", "🖥️", "{ }", "10"],
+  ingenieria: ["🔧", "⚙️", "⚙️", "🔩", "⛑️", "📐"],
+  artes: ["", "", "", "", "", "🎨", "🖌️"],
+  matematicas: ["+", "×", "÷", "=", "π", "√", "7", "9²", "12", "−"],
+};
+
+/**
+ * La tarjeta de un tópico en la portada: la letra de STEAM grande y translúcida al centro, con
+ * los elementos del tema alrededor, y abajo solo el nombre. La escena es decorativa; el lector de
+ * pantalla oye el nombre, la bajada y el avance.
+ */
 export function TopicCard({ topic, progress }: { topic: TopicInfo; progress: ProgressSummary }) {
-  const style = { ["--topic" as string]: TOPIC_COLOR[topic.id] };
   const body = (
     <>
-      <span className="topic-emoji" aria-hidden="true">
-        {topic.emoji}
+      <span className="steam-scene" aria-hidden="true">
+        {topic.id === "matematicas" && <span className="steam-cloud" />}
+        {DECO[topic.id].map((glyph, i) => (
+          <span key={i} className={`steam-deco d${i + 1}`}>
+            {glyph}
+          </span>
+        ))}
+        <span className="steam-letter">{LETTER[topic.id]}</span>
       </span>
-      <strong>{topic.name}</strong>
-      <span className="small muted">{topic.tagline}.</span>
-      {topic.available ? <ProgressChip solved={progress.solved} total={progress.total} /> : <span className="badge badge-muted">Próximamente</span>}
-      <span className="topic-chevron" aria-hidden="true">
-        <Icon name="chevronRight" size={18} />
+      <strong className="steam-name">{topic.name}</strong>
+      <span className="steam-sr sr-only">
+        <span>{topic.tagline}. </span>
+        {topic.available ? <ProgressChip solved={progress.solved} total={progress.total} /> : <span>Próximamente</span>}
       </span>
     </>
   );
   return topic.available ? (
-    <Link className="topic-card" to={`/explorar/${topic.id}`} style={style}>
+    <Link className="steam-card" data-topic={topic.id} to={`/explorar/${topic.id}`}>
       {body}
     </Link>
   ) : (
-    <div className="topic-card" aria-disabled="true" style={style}>
+    <div className="steam-card" data-topic={topic.id} aria-disabled="true">
       {body}
     </div>
   );
