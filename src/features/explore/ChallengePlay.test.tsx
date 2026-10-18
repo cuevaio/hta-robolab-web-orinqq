@@ -13,7 +13,9 @@ vi.mock("convex/react", () => ({
 }));
 
 const voice = vi.hoisted(() => ({ speak: vi.fn() }));
-vi.mock("../student/speech", () => ({ speak: voice.speak, stopSpeaking: vi.fn(), canSpeak: () => true }));
+// La app no usa voz sintética: si algo llamara a la del navegador, estas pruebas lo verían.
+vi.stubGlobal("speechSynthesis", { speak: voice.speak, cancel: vi.fn(), getVoices: () => [] });
+vi.stubGlobal("SpeechSynthesisUtterance", class {});
 
 const sound = vi.hoisted(() => ({ playSound: vi.fn() }));
 vi.mock("../../shared/sound/sounds", () => ({
@@ -62,11 +64,11 @@ afterEach(() => {
 });
 
 describe("el personaje se llama Robi", () => {
-  it("la ficha, la instrucción y el audio al empezar dicen Robi, nunca Kusi", () => {
+  it("la ficha y la instrucción dicen Robi, nunca Kusi, y no hay voz sintética al empezar", () => {
     renderChallenge();
     expect(screen.getByText(/Robi quiere llegar a la estrella/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Empezar el reto/ }));
-    expect(voice.speak).toHaveBeenCalledWith("Robi quiere llegar a la estrella. ¡Está en línea recta!");
+    expect(voice.speak).not.toHaveBeenCalled();
     expect(screen.getAllByText(/Arma el programa para que Robi llegue a la estrella/).length).toBeGreaterThan(0);
     expect(document.body.textContent).not.toMatch(/Kusi/);
   });
@@ -203,5 +205,19 @@ describe("sonidos del reto, sin voces que repitan las acciones", () => {
     fireEvent.click(screen.getByRole("button", { name: /Ejecutar/ }));
     act(() => void vi.advanceTimersByTime(3000));
     expect(names()).toEqual(["play", "step", "oops"]);
+  });
+});
+
+describe("sin voz sintética mientras se juega", () => {
+  it("ni al empezar, ni al armar, ni al ejecutar, ni con los mensajes de Robi, ni con una pista", () => {
+    renderChallenge();
+    fireEvent.click(screen.getByRole("button", { name: /Empezar el reto/ }));
+    const tap = (name: string) => fireEvent.click(within(screen.getByRole("group", { name: "Piezas" })).getByRole("button", { name }));
+    for (let i = 0; i < 3; i++) tap("Avanzar");
+    fireEvent.click(screen.getByRole("button", { name: /Pista/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Ejecutar/ }));
+    act(() => void vi.advanceTimersByTime(3000));
+    expect(screen.getByRole("heading", { name: "¡Reto logrado!" })).toBeTruthy();
+    expect(voice.speak).not.toHaveBeenCalled();
   });
 });

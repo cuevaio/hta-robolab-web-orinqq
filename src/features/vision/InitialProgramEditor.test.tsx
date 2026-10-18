@@ -16,9 +16,11 @@ const session = vi.hoisted(() => ({
   cameraOnly: false,
 }));
 const voice = vi.hoisted(() => ({ speak: vi.fn() }));
+// La app no usa voz sintética: si algo llamara a la del navegador, estas pruebas lo verían.
+vi.stubGlobal("speechSynthesis", { speak: voice.speak, cancel: vi.fn(), getVoices: () => [] });
+vi.stubGlobal("SpeechSynthesisUtterance", class {});
 const sound = vi.hoisted(() => ({ playSound: vi.fn() }));
 vi.mock("../../shared/sound/sounds", () => ({ playSound: sound.playSound, shouldStepSound: () => true }));
-vi.mock("../student/speech", () => ({ speak: voice.speak, stopSpeaking: vi.fn(), canSpeak: () => true }));
 vi.mock("./cameraSession", () => ({
   startCameraSession: (_video: HTMLVideoElement, callbacks: { onSample: typeof session.onSample; onCamera?: () => void; onReady: () => void; onError: (message: string) => void }) => {
     session.start();
