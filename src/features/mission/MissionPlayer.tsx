@@ -106,7 +106,7 @@ export function MissionPlayer({ mission, onSolved, after }: Props) {
               </span>
             </div>
           </section>
-          <aside className="wayra-card card" aria-label="Wayra, tu guía">
+          <aside className="robi-card card" aria-label="Robi, tu guía">
             <GuideAvatar mood={guide.mood} size={56} />
           </aside>
         </div>

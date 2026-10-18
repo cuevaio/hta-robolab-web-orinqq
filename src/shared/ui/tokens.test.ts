@@ -70,7 +70,7 @@ describe("contraste de los tokens (WCAG 2.2 AA)", () => {
     ["texto de marca sobre su fondo suave (badges, tab activa)", "--c-brand-strong", "--c-brand-soft", TEXT],
     ["verde (reglas de contraseña, 'En vivo') sobre el fondo", "--c-ok", "--c-bg", TEXT],
     ["verde sobre su fondo suave", "--c-ok", "--c-ok-soft", TEXT],
-    ["verde en el nombre de Wayra", "--c-ok", "--c-surface", TEXT],
+    ["verde en el nombre de Robi", "--c-ok", "--c-surface", TEXT],
     ["aviso sobre su fondo suave", "--c-warn", "--c-warn-soft", TEXT],
     ["error sobre su fondo suave", "--c-error", "--c-error-soft", TEXT],
     ["error sobre el fondo", "--c-error", "--c-bg", TEXT],

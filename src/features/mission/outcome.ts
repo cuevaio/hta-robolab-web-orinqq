@@ -1,6 +1,6 @@
 import type { ExecutionOutcome } from "@robolab/backend/domain/mission/contracts";
 
-/** Lo que Wayra le dice al niño según cómo terminó su programa. Sin culpas: dice qué pasó y en qué paso. */
+/** Lo que Robi le dice al niño según cómo terminó su programa. Sin culpas: dice qué pasó y en qué paso. */
 export function outcomeMessage(outcome: ExecutionOutcome, failedStep?: number): string {
   const step = failedStep === undefined ? "" : ` en el paso ${failedStep}`;
   switch (outcome) {

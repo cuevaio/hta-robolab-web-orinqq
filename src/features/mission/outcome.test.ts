@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { outcomeMessage } from "./outcome";
 
-describe("lo que Wayra dice al terminar el recorrido", () => {
+describe("lo que Robi dice al terminar el recorrido", () => {
   it("celebra al llegar y no culpa en los errores: dice qué pasó y en qué paso", () => {
     expect(outcomeMessage("SUCCESS")).toMatch(/Llegaste a la meta/);
     expect(outcomeMessage("COLLISION", 3)).toBe("Kusi chocó con un obstáculo en el paso 3. Prueba otro camino.");

@@ -9,11 +9,11 @@ import "./guide.css";
 export const AUTO_FOLD_MS = 10_000;
 
 /**
- * Wayra, la guía de los retos ("viento" en quechua). La dibuja blobatar en el
+ * Robi, la guía de los retos. La dibuja blobatar en el
  * mismo navegador, sin pedir nada a internet. Siempre es la misma porque sale
  * de un nombre fijo; la expresión acompaña lo que pasa en el juego.
  */
-export const GUIDE_NAME = "Wayra";
+export const GUIDE_NAME = "Robi";
 
 const LOOK = { name: "nub", traits: { shape: 0.74 }, hue: 150 } as const;
 
@@ -41,7 +41,7 @@ type Props = {
 };
 
 /**
- * Wayra como asistente flotante en la esquina inferior derecha: su globo con
+ * Robi como asistente flotante en la esquina inferior derecha: su globo con
  * el mensaje y, si la pantalla lo pide, el botón de pista. Tocar su cara
  * esconde el globo (queda solo ella); un mensaje nuevo lo vuelve a abrir. En el
  * celular el globo se esconde solo a los 10 s, porque ahí tapa el juego. El
@@ -75,7 +75,7 @@ export function Guide({ mood = "idle", message, children }: Props) {
         className="guide-face"
         aria-expanded={!folded}
         aria-controls={bubbleId}
-        aria-label={folded ? "Mostrar el mensaje de Wayra" : "Esconder el mensaje de Wayra"}
+        aria-label={folded ? "Mostrar el mensaje de Robi" : "Esconder el mensaje de Robi"}
         onClick={() => setFoldedMessage(folded ? null : message)}
       >
         <GuideAvatar mood={mood} size={72} />

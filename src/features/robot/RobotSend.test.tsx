@@ -75,12 +75,12 @@ describe("sincronizar con robot (wifi)", () => {
 
   it("si el robot dio señal hace poco: 'Robot conectado', botón Robot OK y se puede enviar la secuencia", () => {
     window.localStorage.setItem(ROBOT_KEY, "K7Q4MZ");
-    status.mockReturnValue({ name: "Wayra-12", lastSeenAt: NOW - 1000, codeExpiresAt: NOW + 3_600_000, lastCommand: null });
+    status.mockReturnValue({ name: "Robi-12", lastSeenAt: NOW - 1000, codeExpiresAt: NOW + 3_600_000, lastCommand: null });
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: /Robot OK/ }));
     const sheet = screen.getByRole("dialog");
     expect(within(sheet).getByRole("status").textContent).toBe("Robot conectado");
-    expect(within(sheet).getByText("Wayra-12")).toBeTruthy();
+    expect(within(sheet).getByText("Robi-12")).toBeTruthy();
     expect((within(sheet).getByRole("button", { name: "Enviar al robot" }) as HTMLButtonElement).disabled).toBe(false);
 
     fireEvent.click(within(sheet).getByRole("button", { name: "Robot OK" }));
@@ -89,7 +89,7 @@ describe("sincronizar con robot (wifi)", () => {
 
   it("si el robot lleva más de 10 s sin dar señal vuelve a 'Robot sin conectar' y explica qué revisar", () => {
     window.localStorage.setItem(ROBOT_KEY, "K7Q4MZ");
-    status.mockReturnValue({ name: "Wayra-12", lastSeenAt: NOW - 60_000, codeExpiresAt: NOW + 3_600_000, lastCommand: null });
+    status.mockReturnValue({ name: "Robi-12", lastSeenAt: NOW - 60_000, codeExpiresAt: NOW + 3_600_000, lastCommand: null });
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: /Robot/ }));
     const sheet = screen.getByRole("dialog");

@@ -36,8 +36,8 @@ type Stats = { readonly runs: number; readonly hints: number; readonly ms: numbe
 type Submission = { readonly program?: Program; readonly pick?: Cell };
 
 const INSTRUCTION: Record<Challenge["kind"], string> = {
-  sequence: "Arma el programa para que Wayra llegue a la estrella.",
-  predict: "Lee el programa y toca la casilla donde terminará Wayra.",
+  sequence: "Arma el programa para que Robi llegue a la estrella.",
+  predict: "Lee el programa y toca la casilla donde terminará Robi.",
   fix: "Este programa tiene un error. Quita o cambia bloques para arreglarlo.",
   stops: "Pasa por todas las banderas 🚩 y después llega a la estrella.",
   efficient: "Llega a la estrella usando pocos bloques.",
@@ -110,7 +110,7 @@ function Intro({ challenge, onStart }: { challenge: Challenge; onStart: () => vo
           stepMs={STEP_MS}
           topic={challenge.topic}
         />
-        <Guide message={`¡Hola! Soy Wayra. Si te trabas, pídeme una pista: tienes 3.`} />
+        <Guide message={`¡Hola! Soy Robi. Si te trabas, pídeme una pista: tienes 3.`} />
       </section>
     </div>
   );
@@ -141,7 +141,7 @@ function Play({ challenge, robot, onSolved }: { challenge: Challenge; robot: Rob
 
   const finish = (submission: Submission) => {
     setSolved(true);
-    // Un momento para ver a Wayra en la estrella antes de pasar al resultado.
+    // Un momento para ver a Robi en la estrella antes de pasar al resultado.
     window.setTimeout(() => onSolved({ runs: Math.max(runs, 1), hints, ms: Date.now() - startedAt }, submission), 1200);
   };
 
@@ -167,7 +167,7 @@ function Play({ challenge, robot, onSolved }: { challenge: Challenge; robot: Rob
     ranProgram.current = editor.blocks;
     setRuns((n) => n + 1);
     setBoardMood("idle");
-    setGuide({ mood: "thinking", message: "Mira cómo se mueve Wayra…" });
+    setGuide({ mood: "thinking", message: "Mira cómo se mueve Robi…" });
     run(editor.blocks);
     // Si hay un robot conectado, hace el mismo recorrido.
     if (robot.state === "on") void robot.send(editor.blocks);
@@ -236,7 +236,7 @@ function Play({ challenge, robot, onSolved }: { challenge: Challenge; robot: Rob
               </span>
             </div>
           </section>
-          <aside className="wayra-card card" aria-label="Wayra, tu guía">
+          <aside className="robi-card card" aria-label="Robi, tu guía">
             <GuideAvatar mood={guide.mood} size={56} />
             <button
               className="btn btn-sm"
