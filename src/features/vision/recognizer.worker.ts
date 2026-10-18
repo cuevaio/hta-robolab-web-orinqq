@@ -19,7 +19,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
           await fetch(fileset.wasmBinaryPath).then((response) => response.arrayBuffer()).catch(() => undefined);
           return fileset;
         }),
-        loadModel(MODEL_URL),
+        loadModel(MODEL_URL, undefined, (loaded, total) => reply({ type: "progress", loaded, total })),
       ]);
       recognizer = await GestureRecognizer.createFromOptions(files, {
         baseOptions: {

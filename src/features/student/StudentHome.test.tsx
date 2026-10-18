@@ -5,10 +5,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const home = vi.fn();
 vi.mock("convex/react", () => ({ useQuery: () => home(), useMutation: () => vi.fn() }));
+const warmUp = vi.hoisted(() => vi.fn());
+vi.mock("../vision/recognizer", () => ({ warmUpRecognizer: warmUp }));
 
 import { StudentHome } from "./StudentHome";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  warmUp.mockClear();
+});
 
 const HOME = {
   displayName: "Ana",
@@ -27,6 +32,18 @@ function renderHome() {
 }
 
 describe("portada del alumno", () => {
+  it("si su clase tiene retos de Inicial, empieza a preparar los gestos desde la portada", () => {
+    home.mockReturnValue({ ...HOME, classChallenges: [{ assignmentId: "a1", challengeId: "inicial-paseo", title: "Primer paseo", level: "inicial", kind: "sequence", solved: false }] });
+    renderHome();
+    expect(warmUp).toHaveBeenCalledOnce();
+  });
+
+  it("sin retos de Inicial no baja el modelo de gestos", () => {
+    home.mockReturnValue({ ...HOME, level: "primaria", classChallenges: [{ assignmentId: "a2", challengeId: "primaria-ciencia-reparto", title: "El reparto", level: "primaria", kind: "mission", solved: false }] });
+    renderHome();
+    expect(warmUp).not.toHaveBeenCalled();
+  });
+
   it("solo habla de retos: no hay evaluaciones del día ni fecha", () => {
     home.mockReturnValue(HOME);
     renderHome();
