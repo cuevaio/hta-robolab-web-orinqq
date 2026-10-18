@@ -1,0 +1,225 @@
+/*
+ * Tarjetas STEAM de la portada: la letra grande y translúcida al centro, el tema alrededor
+ * (adornos que escalan con el ancho de la tarjeta) y abajo solo el nombre.
+ */
+.steam-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.steam-card {
+  display: grid;
+  grid-template-rows: auto auto;
+  overflow: hidden;
+  border: 3px solid var(--c-ink);
+  border-radius: 18px;
+  background: var(--steam);
+  box-shadow: var(--shadow);
+  color: var(--c-ink);
+  text-decoration: none;
+  transition:
+    transform 150ms var(--ease),
+    box-shadow 150ms var(--ease);
+}
+
+a.steam-card:hover {
+  transform: translate(-2px, -3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.steam-card[aria-disabled="true"] {
+  opacity: 0.7;
+}
+
+.steam-card[data-topic="ciencia"] {
+  --steam: var(--steam-ciencia);
+  --wash: var(--steam-ciencia-wash);
+}
+
+.steam-card[data-topic="tecnologia"] {
+  --steam: var(--steam-tecnologia);
+  --wash: var(--steam-tecnologia-wash);
+}
+
+.steam-card[data-topic="ingenieria"] {
+  --steam: var(--steam-ingenieria);
+  --wash: var(--steam-ingenieria-wash);
+}
+
+.steam-card[data-topic="artes"] {
+  --steam: var(--steam-artes);
+  --wash: var(--steam-artes-wash);
+}
+
+.steam-card[data-topic="matematicas"] {
+  --steam: var(--steam-matematicas);
+  --wash: var(--steam-matematicas-wash);
+}
+
+.steam-scene {
+  position: relative;
+  aspect-ratio: 200 / 176;
+  overflow: hidden;
+  container-type: size;
+  /* Todo escala con el lado menor de la escena: así la tarjeta ancha de Matemáticas en el celular no se desborda. */
+  --u: 1.136cqmin;
+}
+
+/* La órbita punteada alrededor de la letra. */
+.steam-scene::before {
+  content: "";
+  position: absolute;
+  inset: 12% 9%;
+  border: 2px dashed color-mix(in srgb, var(--c-surface) 75%, transparent);
+  border-radius: 50%;
+}
+
+.steam-letter {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-head);
+  font-size: calc(66 * var(--u));
+  line-height: 1;
+  /* El relleno deja ver el color del tópico; el borde grueso de tinta lo mantiene legible. */
+  color: color-mix(in srgb, var(--c-surface) 30%, transparent);
+  -webkit-text-stroke: 3px var(--c-ink);
+  paint-order: stroke fill;
+}
+
+.steam-deco {
+  position: absolute;
+  font-size: var(--s, calc(20 * var(--u)));
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.steam-name {
+  display: grid;
+  place-items: center;
+  min-height: 56px;
+  padding: 0 8px;
+  border-top: 3px solid var(--c-ink);
+  background: var(--wash);
+  font-family: var(--font-head);
+  font-size: 1.3rem;
+  font-weight: 400;
+  text-align: center;
+}
+
+/* ---- Ciencia: matraz, átomo, microscopio, chispas y burbujas ---- */
+.steam-card[data-topic="ciencia"] .d1 { left: 5%; top: 4%; --s: calc(24 * var(--u)); }
+.steam-card[data-topic="ciencia"] .d2 { color: var(--c-ink); left: 62%; top: 4%; --s: calc(28 * var(--u)); }
+.steam-card[data-topic="ciencia"] .d3 { left: 6%; top: 58%; --s: calc(24 * var(--u)); }
+.steam-card[data-topic="ciencia"] .d4 { left: 80%; top: 62%; --s: calc(12 * var(--u)); }
+.steam-card[data-topic="ciencia"] .d5 { left: 3%; top: 44%; --s: calc(9 * var(--u)); }
+.steam-card[data-topic="ciencia"] .d6 { left: 84%; top: 34%; --s: calc(10 * var(--u)); }
+
+/* ---- Tecnología: chip, wifi, ceros y unos, pantalla ---- */
+.steam-card[data-topic="tecnologia"] .d1 {
+  left: 7%;
+  top: 6%;
+  padding: 2px 6px;
+  border: 2px solid var(--c-ink);
+  border-radius: 6px;
+  background: var(--c-surface);
+  font-family: ui-monospace, Consolas, monospace;
+  font-weight: 800;
+  --s: calc(9 * var(--u));
+}
+.steam-card[data-topic="tecnologia"] .d2 { left: 66%; top: 4%; --s: calc(24 * var(--u)); }
+.steam-card[data-topic="tecnologia"] .d3,
+.steam-card[data-topic="tecnologia"] .d5,
+.steam-card[data-topic="tecnologia"] .d6 {
+  font-family: ui-monospace, Consolas, monospace;
+  font-weight: 800;
+  color: var(--c-surface);
+  --s: calc(9 * var(--u));
+}
+.steam-card[data-topic="tecnologia"] .d3 { left: 6%; top: 66%; }
+.steam-card[data-topic="tecnologia"] .d4 { left: 66%; top: 60%; --s: calc(24 * var(--u)); }
+.steam-card[data-topic="tecnologia"] .d5 { left: 38%; top: 86%; }
+.steam-card[data-topic="tecnologia"] .d6 { left: 52%; top: 70%; }
+
+/* ---- Ingeniería: plano cuadriculado, engranajes, llave, tuerca y casco ---- */
+.steam-card[data-topic="ingenieria"] .steam-scene {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--c-surface) 35%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--c-surface) 35%, transparent) 1px, transparent 1px);
+  background-size: calc(10 * var(--u)) calc(10 * var(--u));
+}
+.steam-card[data-topic="ingenieria"] .d1 { left: 6%; top: 6%; --s: calc(24 * var(--u)); }
+.steam-card[data-topic="ingenieria"] .d2 { left: 64%; top: 4%; --s: calc(26 * var(--u)); }
+.steam-card[data-topic="ingenieria"] .d3 { left: 6%; top: 60%; --s: calc(24 * var(--u)); }
+.steam-card[data-topic="ingenieria"] .d4 { left: 70%; top: 66%; --s: calc(20 * var(--u)); }
+.steam-card[data-topic="ingenieria"] .d5 { left: 40%; top: 72%; --s: calc(16 * var(--u)); }
+.steam-card[data-topic="ingenieria"] .d6 { left: 82%; top: 38%; --s: calc(12 * var(--u)); }
+
+/* ---- Artes: manchas de pintura en varias partes, paleta y pincel ---- */
+.steam-card[data-topic="artes"] .d1,
+.steam-card[data-topic="artes"] .d2,
+.steam-card[data-topic="artes"] .d3,
+.steam-card[data-topic="artes"] .d4,
+.steam-card[data-topic="artes"] .d5 {
+  border-radius: 55% 45% 60% 40% / 50% 60% 40% 50%;
+}
+.steam-card[data-topic="artes"] .d1 { left: -4%; top: -4%; width: calc(34 * var(--u)); height: calc(32 * var(--u)); background: var(--paint-yellow); }
+.steam-card[data-topic="artes"] .d2 { left: 70%; top: 0; width: calc(34 * var(--u)); height: calc(30 * var(--u)); background: var(--paint-blue); }
+.steam-card[data-topic="artes"] .d3 { left: -2%; top: 58%; width: calc(34 * var(--u)); height: calc(30 * var(--u)); background: var(--paint-green); }
+.steam-card[data-topic="artes"] .d4 { left: 68%; top: 58%; width: calc(36 * var(--u)); height: calc(32 * var(--u)); background: var(--paint-violet); }
+.steam-card[data-topic="artes"] .d5 { left: 18%; top: 12%; width: calc(64 * var(--u)); height: calc(58 * var(--u)); background: var(--paint-red); }
+.steam-card[data-topic="artes"] .d6 { left: 12%; top: 66%; --s: calc(14 * var(--u)); }
+.steam-card[data-topic="artes"] .d7 { left: 70%; top: 62%; --s: calc(16 * var(--u)); }
+
+/* ---- Matemáticas: una nube con operaciones flotando ---- */
+/* En Matemáticas la letra va sobre la nube clara: lleva el violeta del tópico para no perderse. */
+.steam-card[data-topic="matematicas"] .steam-letter {
+  color: color-mix(in srgb, var(--steam-matematicas) 55%, transparent);
+}
+
+.steam-cloud {
+  position: absolute;
+  inset: 8% 4% 6%;
+  border: 3px solid var(--c-ink);
+  border-radius: 50% 50% 46% 46% / 58% 58% 42% 42%;
+  background: color-mix(in srgb, var(--c-surface) 85%, transparent);
+}
+.steam-card[data-topic="matematicas"] .steam-deco {
+  font-family: var(--font-head);
+  --s: calc(14 * var(--u));
+}
+.steam-card[data-topic="matematicas"] .d1 { left: 10%; top: 18%; color: var(--paint-red); --s: calc(16 * var(--u)); transform: rotate(-8deg); }
+.steam-card[data-topic="matematicas"] .d2 { left: 72%; top: 62%; color: var(--paint-blue); transform: rotate(10deg); }
+.steam-card[data-topic="matematicas"] .d3 { left: 14%; top: 60%; color: var(--paint-green); transform: rotate(-6deg); }
+.steam-card[data-topic="matematicas"] .d4 { left: 44%; top: 8%; color: var(--paint-red); --s: calc(11 * var(--u)); }
+.steam-card[data-topic="matematicas"] .d5 { left: 76%; top: 20%; color: var(--paint-violet); --s: calc(16 * var(--u)); }
+.steam-card[data-topic="matematicas"] .d6 { left: 78%; top: 40%; color: var(--steam-ingenieria); transform: rotate(8deg); }
+.steam-card[data-topic="matematicas"] .d7 { left: 6%; top: 40%; color: var(--paint-blue); --s: calc(18 * var(--u)); transform: rotate(12deg); }
+.steam-card[data-topic="matematicas"] .d8 { left: 62%; top: 72%; color: var(--paint-violet); --s: calc(13 * var(--u)); }
+.steam-card[data-topic="matematicas"] .d9 { left: 36%; top: 74%; color: var(--paint-violet); --s: calc(15 * var(--u)); }
+.steam-card[data-topic="matematicas"] .d10 { left: 52%; top: 66%; color: var(--paint-green); --s: calc(12 * var(--u)); }
+
+/* Pantallas medianas: las tarjetas se acomodan sin apretarse. */
+@media (max-width: 900px) {
+  .steam-grid {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  }
+}
+
+/* Celular: dos columnas y Matemáticas a ancho completo para que su nube respire. */
+@media (max-width: 560px) {
+  .steam-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .steam-card[data-topic="matematicas"] {
+    grid-column: 1 / -1;
+  }
+
+  .steam-card[data-topic="matematicas"] .steam-scene {
+    aspect-ratio: 358 / 174;
+  }
+}
