@@ -41,15 +41,24 @@ export function TeacherLivePage() {
           <form className="card stack" onSubmit={submit}>
             <h2>Nueva partida</h2>
             <div className="live-form-grid">
-              <label className="field">Clase<select value={classroomId} required disabled={busy} onChange={(e) => setClassroomId(e.target.value)}>
-                <option value="">Elige una clase</option>{classrooms.map((c) => <option key={c._id} value={c._id}>{c.label}</option>)}
-              </select></label>
-              <label className="field">Laberinto<select value={mazeId} disabled={busy} onChange={(e) => setMazeId(e.target.value)}>
-                {LIVE_MAZES.map((maze) => <option key={maze.id} value={maze.id}>{maze.title}</option>)}
-              </select></label>
-              <label className="field">Cómo jugar<select value={mode} disabled={busy} onChange={(e) => setMode(e.target.value as LiveMode)}>
-                <option value="race">Carrera · cada uno en su tablero</option><option value="cooperative">En equipo · tablero compartido</option>
-              </select></label>
+              <div className="field">
+                <label htmlFor="live-classroom">Clase</label>
+                <select id="live-classroom" className="select" value={classroomId} required disabled={busy} onChange={(e) => setClassroomId(e.target.value)}>
+                  <option value="">Elige una clase</option>{classrooms.map((c) => <option key={c._id} value={c._id}>{c.label}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="live-maze">Laberinto</label>
+                <select id="live-maze" className="select" value={mazeId} disabled={busy} onChange={(e) => setMazeId(e.target.value)}>
+                  {LIVE_MAZES.map((maze) => <option key={maze.id} value={maze.id}>{maze.title}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="live-mode">Cómo jugar</label>
+                <select id="live-mode" className="select" value={mode} disabled={busy} onChange={(e) => setMode(e.target.value as LiveMode)}>
+                  <option value="race">Carrera · cada uno en su tablero</option><option value="cooperative">En equipo · tablero compartido</option>
+                </select>
+              </div>
             </div>
             <p className="small muted">{mode === "race" ? "Todos empiezan juntos. El servidor confirma quién llega primero." : "Los alumnos agregan movimientos a un programa compartido y lo prueban entre todos."}</p>
             {error && <p role="alert" className="alert alert-error">{error}</p>}
