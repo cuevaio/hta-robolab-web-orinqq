@@ -14,7 +14,7 @@ import { outcomeMessage } from "./outcome";
 
 /** Lo que dura cada paso del robot al reproducir el recorrido. */
 export const STEP_MS = 450;
-const WELCOME = "Programa a Kusi para que llegue a la meta sin gastar más energía de la que tiene.";
+const WELCOME = "Programa a Robi para que llegue a la meta sin gastar más energía de la que tiene.";
 
 export type Played = { readonly program: readonly Block[]; readonly runs: number; readonly ms: number };
 
@@ -79,7 +79,7 @@ export function MissionPlayer({ mission, onSolved, after }: Props) {
     setRuns(runCount);
     setRunning(true);
     setView(initial);
-    setGuide({ mood: "thinking", message: "Mira cómo se mueve Kusi…" });
+    setGuide({ mood: "thinking", message: "Mira cómo se mueve Robi…" });
     playSound("play");
     trace.steps.forEach((step, i) => {
       timers.current.push(
