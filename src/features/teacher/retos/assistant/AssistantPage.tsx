@@ -7,7 +7,7 @@ import { agentChallengeId } from "@robolab/backend/domain/classroom/agentItem";
 import { userMessage } from "../../../../shared/errors";
 import { Icon } from "../../../../shared/ui/Icon";
 import { useFocusOnMount } from "../../../../shared/useFocusOnMount";
-import { checkLocalModel, LocalGenerationError, requestLocalMissions } from "./localGeneration";
+import { createJetsonLink, LocalGenerationError } from "./localGeneration";
 import { usePageTitle } from "../../../../shared/usePageTitle";
 import { MissionPlayer } from "../../../mission/MissionPlayer";
 import { CreatorStepper } from "../CreatorStepper";
@@ -64,21 +64,17 @@ export function AssistantPage() {
   const [source, setSource] = useState<"cloud" | "local">("cloud");
   const [connection, setConnection] = useState<"idle" | "checking" | "ready" | "unavailable">("idle");
   const [connectionError, setConnectionError] = useState("");
-  const [checkCount, setCheckCount] = useState(0);
+  const [localLink] = useState(() => createJetsonLink());
   const localRequest = useRef<AbortController | null>(null);
-  useEffect(() => () => localRequest.current?.abort(), []);
   useEffect(() => {
-    if (source !== "local") return;
-    const controller = new AbortController();
-    void checkLocalModel(controller.signal).then(ready => {
-      if (controller.signal.aborted) return;
-      setConnection(ready ? "ready" : "unavailable");
-      if (!ready) setConnectionError("El modelo no está disponible. Revisa la conexión USB y Ollama en la Jetson.");
-    }).catch((error: unknown) => {
-      if (!controller.signal.aborted) { setConnection("unavailable"); setConnectionError(error instanceof Error ? error.message : "No encontramos el conector local."); }
-    });
-    return () => controller.abort();
-  }, [source, checkCount]);
+    const unsubscribe = localLink.subscribeDisconnected(message => { setConnection("unavailable"); setConnectionError(message); });
+    return () => { unsubscribe(); localRequest.current?.abort(); void localLink.disconnect(); };
+  }, [localLink]);
+  async function connectJetson() {
+    setConnection("checking"); setConnectionError("");
+    try { await localLink.connect(); setConnection("ready"); }
+    catch (error) { setConnection("unavailable"); setConnectionError(error instanceof Error ? error.message : "No pudimos conectar la Jetson."); }
+  }
   const save = useMutation(api.agent.save);
   const createReto = useMutation(api.assignments.create);
   const classes = useQuery(api.classrooms.listMine);
@@ -110,7 +106,7 @@ export function AssistantPage() {
     if (source === "cloud") return generate(request);
     const controller = new AbortController(); localRequest.current = controller;
     try {
-      const local = await requestLocalMissions(request, controller.signal);
+      const local = await localLink.generate(request, controller.signal);
       if (!local.missions.length) return { status: "ok" as const, proposals: [], failed: local.failed };
       const checked = await reviewLocal({ ...request, missions: local.missions });
       return { ...checked, failed: checked.failed.map(f => local.failed.find(localFailure => localFailure.grade === f.grade) ?? f) };
@@ -349,7 +345,7 @@ export function AssistantPage() {
             <legend>Dónde generar</legend>
             <div className="row">
               <button type="button" className="chip-btn" aria-pressed={source === "cloud"} onClick={() => setSource("cloud")}>Nube</button>
-              <button type="button" className="chip-btn" aria-pressed={source === "local"} onClick={() => { if (source !== "local") { setSource("local"); setConnection("checking"); setConnectionError(""); } }}>Jetson por USB</button>
+              <button type="button" className="chip-btn" aria-pressed={source === "local"} onClick={() => setSource("local")}>Jetson por USB</button>
             </div>
             {source === "cloud" ? (
               <p className="small" role="status">{status?.configured === false ? "La generación en la nube no está activada. Puedes usar una Jetson conectada a esta laptop." : "Usa el asistente en línea de RoboLab."}</p>
@@ -357,8 +353,12 @@ export function AssistantPage() {
               <>
                 <p className="small">Qwen genera en tu Jetson. Para revisar, guardar y asignar seguimos usando RoboLab en línea.</p>
                 <p className="small" role="status">{connection === "ready" ? "Jetson conectada · Qwen 2.5 3B" : connection === "checking" ? "Comprobando la conexión…" : connectionError}</p>
-                <p className="small muted">Conecta la Jetson por USB y mantén abierto el conector local en esta laptop.</p>
-                {connection === "unavailable" && <div><button type="button" className="btn btn-sm" onClick={() => { setConnection("checking"); setConnectionError(""); setCheckCount(n => n + 1); }}>Comprobar conexión</button></div>}
+                <p className="small muted">Conecta el cable USB y elige la Jetson. No necesitas configurar la red de esta computadora.</p>
+                <div>{connection === "ready" ? (
+                  <button type="button" className="btn btn-sm" onClick={() => { void localLink.disconnect(); setConnection("idle"); setConnectionError(""); }}>Desconectar Jetson</button>
+                ) : (
+                  <button type="button" className="btn btn-sm" disabled={connection === "checking"} onClick={() => void connectJetson()}>{connection === "checking" ? "Conectando…" : "Conectar Jetson"}</button>
+                )}</div>
               </>
             )}
           </fieldset>

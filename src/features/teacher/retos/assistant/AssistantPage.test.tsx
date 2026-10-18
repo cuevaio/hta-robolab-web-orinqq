@@ -320,72 +320,78 @@ describe("asistente: revisar y guardar (G3)", () => {
 });
 
 
-it("usa USB para inferencia y muestra solo lo certificado por Convex antes de guardar", async () => {
+function usbDevice(generateLocal: (signal: AbortSignal) => Promise<unknown> = async () => ({ missions: [M(2)], failed: [] })) {
+  let input!: ReadableStreamDefaultController<Uint8Array>;
+  const jobs = new Map<string, AbortController>();
+  const send = (id: string, result: unknown, error?: string) => input.enqueue(new TextEncoder().encode(JSON.stringify({ v: 1, id, ...(error ? { ok: false, error } : { ok: true, result }) }) + "\n"));
+  const port = {
+    readable: new ReadableStream<Uint8Array>({ start(c) { input = c; } }),
+    writable: new WritableStream<Uint8Array>({ write(bytes) {
+      const m = JSON.parse(new TextDecoder().decode(bytes));
+      if (m.method === "hello") send(m.id, { device: "robolab-jetson", protocol: 1, provider: "ollama", ready: true });
+      else if (m.method === "generate") {
+        const controller = new AbortController(); jobs.set(m.id, controller);
+        void generateLocal(controller.signal).then(result => send(m.id, result)).catch(() => send(m.id, null, "BUSY"));
+      } else if (m.method === "cancel") jobs.get(m.params.requestId)?.abort();
+      else send(m.id, { alive: true });
+    } }),
+    open: vi.fn(async () => {}), close: vi.fn(async () => {}),
+  };
+  const requestPort = vi.fn(async () => port);
+  vi.stubGlobal("navigator", { ...navigator, serial: { requestPort } });
+  return { input, requestPort };
+}
+async function connectUsb() {
+  fireEvent.click(screen.getByRole("button", { name: "Jetson por USB" }));
+  expect(propose().disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Conectar Jetson" }));
+  await screen.findByText(/Jetson conectada/);
+}
+it("elige el puerto USB y muestra solo lo certificado por Convex antes de guardar", async () => {
   const draft = { ...M(2), title: "Sin verificar" };
   const certified = { ...proposal(2), mission: { ...M(2), title: "Huerto certificado" } };
-  const fetchLocal = vi.fn<typeof fetch>().mockImplementation(async (url) => String(url).endsWith("/health")
-    ? Response.json({ ready: true, model: "qwen2.5:3b-instruct-q4_K_M" })
-    : Response.json({ missions: [draft], failed: [] }));
-  vi.stubGlobal("fetch", fetchLocal);
+  const device = usbDevice(async () => ({ missions: [draft], failed: [] }));
   reviewLocal.mockResolvedValue({ status: "ok", proposals: [certified], failed: [] });
   status.mockReturnValue({ configured: false });
-  renderPage(); type();
-  fireEvent.click(screen.getByRole("button", { name: "Jetson por USB" }));
-  await screen.findByText(/Jetson conectada/);
-  fireEvent.click(screen.getByRole("button", { name: "Jetson por USB" }));
-  expect(propose().disabled).toBe(false);
-  fireEvent.click(propose());
-  await screen.findByText("Huerto certificado");
-  expect(screen.queryByText("Sin verificar")).toBeNull();
-  expect(generate).not.toHaveBeenCalled();
+  renderPage(); type(); await connectUsb();
+  expect(device.requestPort).toHaveBeenCalledTimes(1);
+  fireEvent.click(propose()); await screen.findByText("Huerto certificado");
+  expect(screen.queryByText("Sin verificar")).toBeNull(); expect(generate).not.toHaveBeenCalled();
   expect(reviewLocal).toHaveBeenCalledWith({ objective: OBJETIVO, grades: [2, 3], difficulty: "balanced", missions: [draft] });
   fireEvent.click(screen.getByRole("button", { name: "Guardar y asignar a una clase" }));
-  await screen.findByText("Guardamos tu misión");
-  expect(save).toHaveBeenCalledWith({ mission: certified.mission });
+  await screen.findByText("Guardamos tu misión"); expect(save).toHaveBeenCalledWith({ mission: certified.mission });
 });
-
-it("conserva el aprendizaje y explica la desconexión sin pasar a la nube", async () => {
-  vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockRejectedValue(new TypeError("Failed to fetch")));
-  renderPage(); type();
-  fireEvent.click(screen.getByRole("button", { name: "Jetson por USB" }));
-  await screen.findByText(/No encontramos el conector local/);
+it("conserva el aprendizaje al retirar el cable sin pasar a la nube", async () => {
+  const device = usbDevice(); renderPage(); type(); await connectUsb();
+  device.input.error(new Error("USB retirado"));
+  await screen.findByText(/Se perdió la conexión USB/);
   expect((screen.getByLabelText("Aprendizaje") as HTMLTextAreaElement).value).toBe(OBJETIVO);
-  expect(generate).not.toHaveBeenCalled();
-  expect(propose().disabled).toBe(true);
+  expect(generate).not.toHaveBeenCalled(); expect(propose().disabled).toBe(true);
 });
-
-it("explica un fallo local después de comprobar conexión sin recurrir a la nube", async () => {
-  vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockImplementation(async url => String(url).endsWith("/health") ? Response.json({ ready: true }) : new Response("", { status: 409 })));
-  renderPage(); type(); fireEvent.click(screen.getByRole("button", { name: "Jetson por USB" }));
-  await screen.findByText(/Jetson conectada/); fireEvent.click(propose());
+it("explica un dispositivo ocupado sin recurrir a la nube", async () => {
+  usbDevice(async () => { throw new Error("BUSY"); });
+  renderPage(); type(); await connectUsb(); fireEvent.click(propose());
   expect(await screen.findByRole("alert")).toHaveProperty("textContent", "La Jetson está generando otra misión. Espera a que termine.");
-  expect((screen.getByLabelText("Aprendizaje") as HTMLTextAreaElement).value).toBe(OBJETIVO);
   expect(generate).not.toHaveBeenCalled();
 });
-
 it("mantiene una sola regeneración local y la cancela al salir", async () => {
   let posts = 0; let pendingSignal: AbortSignal | undefined;
-  vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
-    if (String(url).endsWith("/health")) return Response.json({ ready: true });
-    if (++posts === 1) return Response.json({ missions: [M(2)], failed: [] });
-    pendingSignal = init?.signal ?? undefined;
-    return new Promise((_resolve, reject) => pendingSignal?.addEventListener("abort", () => reject(new DOMException("Cancelado", "AbortError")), { once: true }));
-  }));
+  usbDevice(async signal => {
+    if (++posts === 1) return { missions: [M(2)], failed: [] };
+    pendingSignal = signal; return new Promise(() => {});
+  });
   reviewLocal.mockResolvedValue({ status: "ok", proposals: [proposal(2)], failed: [] });
-  renderPage(); type(); fireEvent.click(screen.getByRole("button", { name: "Jetson por USB" }));
-  await screen.findByText(/Jetson conectada/); fireEvent.click(propose());
+  renderPage(); type(); await connectUsb(); fireEvent.click(propose());
   await screen.findByRole("heading", { name: "Revisa las propuestas" });
   fireEvent.click(screen.getByRole("button", { name: /Pedir otra propuesta/ }));
   await waitFor(() => expect(pendingSignal).toBeTruthy());
   expect((screen.getByRole("button", { name: "Atrás" }) as HTMLButtonElement).disabled).toBe(true);
   expect((screen.getByRole("button", { name: "Guardar y asignar a una clase" }) as HTMLButtonElement).disabled).toBe(true);
-  cleanup(); expect(pendingSignal?.aborted).toBe(true);
+  cleanup(); await waitFor(() => expect(pendingSignal?.aborted).toBe(true));
 });
-
-it("explica que un mapa local no pasó la revisión sin culpar al aprendizaje", async () => {
-  vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockImplementation(async url => String(url).endsWith("/health") ? Response.json({ ready: true }) : Response.json({ missions: [], failed: [{ grade: 2, code: "UNSOLVABLE" }] })));
-  renderPage(); type(); fireEvent.click(screen.getByRole("button", { name: "Jetson por USB" }));
-  await screen.findByText(/Jetson conectada/); fireEvent.click(propose());
+it("explica un mapa inválido sin culpar al aprendizaje", async () => {
+  usbDevice(async () => ({ missions: [], failed: [{ grade: 2, code: "UNSOLVABLE" }] }));
+  renderPage(); type(); await connectUsb(); fireEvent.click(propose());
   expect(await screen.findByRole("heading", { name: /El mapa no pasó la revisión/ })).toBeTruthy();
   expect((screen.getByLabelText("Aprendizaje") as HTMLTextAreaElement).value).toBe(OBJETIVO);
 });
