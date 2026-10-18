@@ -8,11 +8,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const generate = vi.fn();
 const save = vi.fn();
+const createReto = vi.fn();
 const status = vi.fn();
+const classes = vi.fn();
 vi.mock("convex/react", () => ({
-  useQuery: () => status(),
+  useQuery: (ref: unknown) => (getFunctionName(ref as never) === "classrooms:listMine" ? classes() : status()),
   useAction: () => generate,
-  useMutation: () => save,
+  useMutation: (ref: unknown) => (getFunctionName(ref as never) === "assignments:create" ? createReto : save),
 }));
 
 import { AssistantPage } from "./AssistantPage";
@@ -24,13 +26,18 @@ const OBJETIVO = "Comparar sumas de costos y elegir un recorrido con presupuesto
 beforeEach(() => {
   status.mockReturnValue({ configured: true });
   generate.mockResolvedValue({ status: "ok", proposals: [proposal(2), proposal(3)], failed: [] });
-  save.mockResolvedValue("m1");
-  void getFunctionName;
+  save.mockImplementation(async () => `m${save.mock.calls.length}`);
+  createReto.mockResolvedValue("a1");
+  classes.mockReturnValue([
+    { _id: "c1", label: "Primaria · 3.º · Sección A" },
+    { _id: "c2", label: "Primaria · 3.º · Sección B" },
+  ]);
 });
 afterEach(() => {
   cleanup();
   generate.mockReset();
   save.mockReset();
+  createReto.mockReset();
 });
 
 function renderPage() {
@@ -197,24 +204,76 @@ describe("asistente: revisar y guardar (G3)", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /Usar/ })[1]!);
     expect(screen.getByText("1 misión elegida")).toBeTruthy();
     fireEvent.click(screen.getAllByRole("button", { name: /Usar/ })[0]!);
-    expect((screen.getByRole("button", { name: "Guardar misiones" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Guardar y asignar a una clase" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("guarda solo las elegidas (el servidor vuelve a revisar) y avisa que quedan como borradores", async () => {
+  it("«Guardar y asignar» guarda solo las elegidas (el servidor vuelve a revisar) y pide la clase", async () => {
     await review();
     fireEvent.click(screen.getAllByRole("button", { name: /Usar/ })[1]!);
-    fireEvent.click(screen.getByRole("button", { name: "Guardar misiones" }));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y asignar a una clase" }));
     expect(await screen.findByRole("heading", { name: "Guardamos tu misión" })).toBeTruthy();
     expect(save).toHaveBeenCalledTimes(1);
     expect(save).toHaveBeenCalledWith({ mission: M(2) });
-    expect(screen.getByText(/borradores/)).toBeTruthy();
-    expect((screen.getByRole("link", { name: "Volver a Retos" }) as HTMLAnchorElement).getAttribute("href")).toBe("/docente/retos");
+    const form = within(screen.getByRole("form", { name: "Asignar a una clase" }));
+    expect((form.getByRole("button", { name: "Asignar a la clase" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(within(form.getByLabelText("Clase")).getAllByRole("option").map((o) => o.textContent)).toEqual(["Elige una clase", "Primaria · 3.º · Sección A", "Primaria · 3.º · Sección B"]);
+  });
+
+  it("asigna cada misión guardada a la clase elegida, para que los alumnos la jueguen", async () => {
+    await review();
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y asignar a una clase" }));
+    await screen.findByRole("heading", { name: "Guardamos tus 2 misiones" });
+    fireEvent.change(screen.getByLabelText("Clase"), { target: { value: "c2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Asignar a la clase" }));
+    expect(await screen.findByText(/ya pueden jugar las misiones/)).toBeTruthy();
+    expect(createReto.mock.calls.map((c) => c[0])).toEqual([
+      { challengeId: "ia:m1", visibility: "class", classroomId: "c2" },
+      { challengeId: "ia:m2", visibility: "class", classroomId: "c2" },
+    ]);
+    expect(screen.getByText("Primaria · 3.º · Sección B")).toBeTruthy();
+    expect((screen.getByRole("link", { name: "Ir a Retos" }) as HTMLAnchorElement).getAttribute("href")).toBe("/docente/retos");
+  });
+
+  it("si el servidor rechaza la asignación muestra su mensaje y se puede reintentar", async () => {
+    createReto.mockRejectedValueOnce(new ConvexError("Ese reto ya está en la clase."));
+    await review();
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y asignar a una clase" }));
+    await screen.findByRole("heading", { name: "Guardamos tus 2 misiones" });
+    fireEvent.change(screen.getByLabelText("Clase"), { target: { value: "c1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Asignar a la clase" }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/ya está en la clase/);
+    expect(screen.getByRole("form", { name: "Asignar a una clase" })).toBeTruthy();
+  });
+
+  it("también se pueden dejar como borradores, sin clase", async () => {
+    await review();
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y asignar a una clase" }));
+    await screen.findByRole("heading", { name: "Guardamos tus 2 misiones" });
+    expect((screen.getByRole("link", { name: "Dejar como borradores" }) as HTMLAnchorElement).getAttribute("href")).toBe("/docente/retos");
+    expect(createReto).not.toHaveBeenCalled();
+  });
+
+  it("sin clases explica cómo seguir", async () => {
+    classes.mockReturnValue([]);
+    await review();
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y asignar a una clase" }));
+    expect(await screen.findByText(/Todavía no tienes clases/)).toBeTruthy();
+  });
+
+  it("«Probar» deja jugar la misión sin guardarla, y se vuelve a las propuestas", async () => {
+    await review();
+    fireEvent.click(within(within(screen.getByRole("list", { name: "Propuestas" })).getAllByRole("listitem")[0]!).getByRole("button", { name: /Probar/ }));
+    expect(screen.getByText(/Esta partida no cuenta en ningún resultado/)).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: `${M(2).title}.` })).toBeTruthy();
+    expect(save).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Volver a las propuestas/ }));
+    expect(screen.getByRole("heading", { name: "Revisa las propuestas" })).toBeTruthy();
   });
 
   it("si el servidor rechaza al guardar muestra su mensaje y conserva la revisión", async () => {
     save.mockRejectedValueOnce(new ConvexError("La misión no se puede resolver."));
     await review();
-    fireEvent.click(screen.getByRole("button", { name: "Guardar misiones" }));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y asignar a una clase" }));
     expect((await screen.findByRole("alert")).textContent).toMatch(/no se puede resolver/);
     expect(screen.getByRole("heading", { name: "Revisa las propuestas" })).toBeTruthy();
   });
