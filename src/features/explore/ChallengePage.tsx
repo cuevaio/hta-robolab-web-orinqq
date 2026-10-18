@@ -2,6 +2,7 @@ import { useMutation } from "convex/react";
 import { useEffect, useReducer, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { api } from "@robolab/backend/convex/_generated/api";
+import { agentIdOf } from "@robolab/backend/domain/classroom/agentItem";
 import { capacityText, evidenceFor } from "@robolab/backend/domain/curriculum/competencias";
 import { type Challenge, KIND_LABEL, challengeById, topicInfo } from "@robolab/backend/domain/explore/challenges";
 import { type CheckResult, checkPrediction, checkProgram } from "@robolab/backend/domain/explore/check";
@@ -15,6 +16,7 @@ import { Guide, GuideAvatar, type Mood } from "../../shared/ui/Guide";
 import { Icon } from "../../shared/ui/Icon";
 import { useFocusOnMount } from "../../shared/useFocusOnMount";
 import { MissionRoute } from "../lab/MissionRoute";
+import { AgentMissionRoute } from "../mission/AgentMissionRoute";
 import { BlockEditor } from "../game/BlockEditor";
 import { warmUpRecognizer } from "../vision/recognizer";
 import { InitialProgramEditor } from "../vision/InitialProgramEditor";
@@ -380,6 +382,7 @@ function ChallengePage({ challenge }: { challenge: Challenge }) {
 /** /reto/:id: un reto de bloques (Inicial) o una misión (Primaria). Cambiar de reto monta una pantalla nueva (estado limpio). */
 export function ChallengeRoute() {
   const { id = "" } = useParams();
+  if (agentIdOf(id) !== null) return <AgentMissionRoute key={id} challengeId={id} />;
   const mission = missionById(id);
   if (mission) return <MissionRoute key={mission.id} mission={mission} />;
   const challenge = challengeById(id);

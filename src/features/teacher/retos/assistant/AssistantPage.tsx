@@ -2,9 +2,12 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "@robolab/backend/convex/_generated/api";
+import type { Id } from "@robolab/backend/convex/_generated/dataModel";
+import { agentChallengeId } from "@robolab/backend/domain/classroom/agentItem";
 import { userMessage } from "../../../../shared/errors";
 import { Icon } from "../../../../shared/ui/Icon";
 import { usePageTitle } from "../../../../shared/usePageTitle";
+import { MissionPlayer } from "../../../mission/MissionPlayer";
 import { CreatorStepper } from "../CreatorStepper";
 import { GAME_PATH } from "./NewRetoChoice";
 import { MissionPreview } from "./MissionPreview";
@@ -55,6 +58,8 @@ export function AssistantPage() {
   const status = useQuery(api.agent.status);
   const generate = useAction(api.agent.generate);
   const save = useMutation(api.agent.save);
+  const createReto = useMutation(api.assignments.create);
+  const classes = useQuery(api.classrooms.listMine);
 
   const [objective, setObjective] = useState("");
   const [grades, setGrades] = useState<readonly Grade[]>([2, 3]);
@@ -67,7 +72,11 @@ export function AssistantPage() {
   const [error, setError] = useState<string | null>(null);
   const [asking, setAsking] = useState<readonly Grade[]>([]);
   const [saving, setSaving] = useState(false);
-  const [savedCount, setSavedCount] = useState(0);
+  const [savedIds, setSavedIds] = useState<readonly Id<"agentMissions">[]>([]);
+  const [trying, setTrying] = useState<Proposal | null>(null);
+  const [classId, setClassId] = useState("");
+  const [assigning, setAssigning] = useState(false);
+  const [assignedTo, setAssignedTo] = useState<string | null>(null);
 
   const text = objective.trim();
   const valid = text.length >= OBJECTIVE_MIN && objective.length <= OBJECTIVE_MAX && grades.length >= 1 && grades.length <= 3;
@@ -120,18 +129,34 @@ export function AssistantPage() {
   async function saveChosen() {
     setSaving(true);
     setError(null);
-    let done = 0;
+    const ids: Id<"agentMissions">[] = [];
     try {
-      for (const p of proposals.filter((x) => chosen.has(x.grade))) {
-        await save({ mission: p.mission });
-        done++;
-      }
-      setSavedCount(done);
+      for (const p of proposals.filter((x) => chosen.has(x.grade))) ids.push(await save({ mission: p.mission }));
+      setSavedIds(ids);
       setPhase("saved");
     } catch (e) {
-      setError(`${userMessage(e)}${done > 0 ? ` Ya se guardaron ${done}.` : ""}`);
+      setError(`${userMessage(e)}${ids.length > 0 ? ` Ya se guardaron ${ids.length}.` : ""}`);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function assignSaved(event: FormEvent) {
+    event.preventDefault();
+    if (!classId || assigning) return;
+    setAssigning(true);
+    setError(null);
+    let done = 0;
+    try {
+      for (const id of savedIds) {
+        await createReto({ challengeId: agentChallengeId(id), visibility: "class", classroomId: classId as Id<"classrooms"> });
+        done++;
+      }
+      setAssignedTo(classes?.find((c) => c._id === classId)?.label ?? "tu clase");
+    } catch (e) {
+      setError(`${userMessage(e)}${done > 0 ? ` Ya se asignaron ${done}.` : ""}`);
+    } finally {
+      setAssigning(false);
     }
   }
 
@@ -157,17 +182,69 @@ export function AssistantPage() {
     <div className="stack creator" aria-labelledby="assistant-title" role="group">
       <CreatorStepper current={stepIndex as 0 | 1 | 2} labels={STEPS} />
 
-      {phase === "saved" ? (
+      {trying ? (
+        <section className="stack" aria-label="Probar la misión">
+          <p className="small muted">Estás probando la misión. Esta partida no cuenta en ningún resultado.</p>
+          <MissionPlayer mission={trying.mission} />
+          <div>
+            <button type="button" className="btn" onClick={() => setTrying(null)}>
+              <Icon name="arrowLeft" size={16} /> Volver a las propuestas
+            </button>
+          </div>
+        </section>
+      ) : phase === "saved" ? (
         <section className="stack" aria-live="polite">
           <h1 id="assistant-title" className="creator-title">
-            {savedCount === 1 ? "Guardamos tu misión" : `Guardamos tus ${savedCount} misiones`}
+            {savedIds.length === 1 ? "Guardamos tu misión" : `Guardamos tus ${savedIds.length} misiones`}
           </h1>
-          <p>Quedan como borradores tuyos. Por ahora no se pueden asignar a una clase ni jugar: eso llega en el siguiente paso.</p>
-          <div className="row">
-            <Link className="btn btn-primary" to="/docente/retos">
-              Volver a Retos
-            </Link>
-          </div>
+          {assignedTo ? (
+            <>
+              <p>
+                Tus alumnos de <strong>{assignedTo}</strong> ya pueden jugar{savedIds.length === 1 ? " la misión" : " las misiones"}. Verás sus resultados en Retos y en Progreso.
+              </p>
+              <div className="row">
+                <Link className="btn btn-primary" to="/docente/retos">
+                  Ir a Retos
+                </Link>
+              </div>
+            </>
+          ) : (
+            <form className="card stack assistant-form" onSubmit={assignSaved} aria-label="Asignar a una clase">
+              <p>Elige una clase para que tus alumnos las jueguen, o déjalas como borradores tuyos.</p>
+              {classes === undefined ? (
+                <p className="muted small">Cargando tus clases…</p>
+              ) : classes.length === 0 ? (
+                <p className="hint">
+                  Todavía no tienes clases. <Link to="/docente/clases/nueva">Crea una</Link> y vuelve a asignar desde Retos.
+                </p>
+              ) : (
+                <div className="field">
+                  <label htmlFor="assign-class">Clase</label>
+                  <select id="assign-class" className="select" value={classId} onChange={(e) => setClassId(e.target.value)} required>
+                    <option value="">Elige una clase</option>
+                    {classes.map((c) => (
+                      <option key={c._id} value={c._id}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {error && (
+                <p className="alert alert-error" role="alert">
+                  {error}
+                </p>
+              )}
+              <div className="row">
+                <button type="submit" className="btn btn-primary" disabled={!classId || assigning} aria-busy={assigning}>
+                  {assigning ? "Asignando…" : "Asignar a la clase"}
+                </button>
+                <Link className="link-btn" to="/docente/retos">
+                  Dejar como borradores
+                </Link>
+              </div>
+            </form>
+          )}
         </section>
       ) : phase === "review" ? (
         <section className="stack" aria-labelledby="assistant-title">
@@ -213,6 +290,9 @@ export function AssistantPage() {
                     >
                       {on && <Icon name="check" size={16} />} Usar
                     </button>
+                    <button type="button" className="btn" onClick={() => setTrying(p)}>
+                      <Icon name="play" size={16} /> Probar
+                    </button>
                     <button type="button" className="btn btn-ghost btn-sm" disabled={busy} aria-busy={busy} aria-label={`Pedir otra propuesta para ${gradeName(p.grade)} grado`} onClick={() => void another(p.grade)}>
                       <Icon name="rotate" size={16} /> {busy ? "Pensando…" : "Otra"}
                     </button>
@@ -234,7 +314,7 @@ export function AssistantPage() {
               {chosen.size === 1 ? "1 misión elegida" : `${chosen.size} misiones elegidas`}
             </span>
             <button type="button" className="btn btn-primary" disabled={chosen.size === 0 || saving} aria-busy={saving} onClick={() => void saveChosen()}>
-              {saving ? "Guardando…" : "Guardar misiones"}
+              {saving ? "Guardando…" : "Guardar y asignar a una clase"}
             </button>
           </div>
         </section>
