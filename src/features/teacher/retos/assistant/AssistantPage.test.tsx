@@ -7,13 +7,14 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const generate = vi.fn();
+const reviewLocal = vi.fn();
 const save = vi.fn();
 const createReto = vi.fn();
 const status = vi.fn();
 const classes = vi.fn();
 vi.mock("convex/react", () => ({
   useQuery: (ref: unknown) => (getFunctionName(ref as never) === "classrooms:listMine" ? classes() : status()),
-  useAction: () => generate,
+  useAction: (ref: unknown) => getFunctionName(ref as never) === "agent:reviewLocal" ? reviewLocal : generate,
   useMutation: (ref: unknown) => (getFunctionName(ref as never) === "assignments:create" ? createReto : save),
 }));
 
@@ -36,6 +37,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   generate.mockReset();
+  reviewLocal.mockReset();
+  vi.unstubAllGlobals();
   save.mockReset();
   createReto.mockReset();
 });
@@ -152,11 +155,12 @@ describe("asistente: describir el aprendizaje (G2)", () => {
     expect((screen.getByRole("link", { name: /Elegir un juego/ }) as HTMLAnchorElement).getAttribute("href")).toBe("/docente/retos/nuevo/juego");
   });
 
-  it("si ya se sabe que no está activado, no muestra el formulario", () => {
+  it("si la nube no está activada permite preparar la generación con Jetson", () => {
     status.mockReturnValue({ configured: false });
     renderPage();
-    expect(screen.getByRole("heading", { level: 1, name: "El asistente aún no está activado" })).toBeTruthy();
-    expect(screen.queryByLabelText("Aprendizaje")).toBeNull();
+    expect(screen.getByRole("button", { name: "Jetson por USB" })).toBeTruthy();
+    expect(screen.getByLabelText("Aprendizaje")).toBeTruthy();
+    expect(screen.getByText(/La generación en la nube no está activada/)).toBeTruthy();
   });
 
   it("Cancelar vuelve a los dos caminos", () => {
@@ -313,4 +317,81 @@ describe("asistente: revisar y guardar (G3)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Atrás/ }));
     expect((screen.getByLabelText("Aprendizaje") as HTMLTextAreaElement).value).toBe(OBJETIVO);
   });
+});
+
+
+function usbDevice(generateLocal: (signal: AbortSignal) => Promise<unknown> = async () => ({ missions: [M(2)], failed: [] })) {
+  let input!: ReadableStreamDefaultController<Uint8Array>;
+  const jobs = new Map<string, AbortController>();
+  const send = (id: string, result: unknown, error?: string) => input.enqueue(new TextEncoder().encode(JSON.stringify({ v: 1, id, ...(error ? { ok: false, error } : { ok: true, result }) }) + "\n"));
+  const port = {
+    readable: new ReadableStream<Uint8Array>({ start(c) { input = c; } }),
+    writable: new WritableStream<Uint8Array>({ write(bytes) {
+      const m = JSON.parse(new TextDecoder().decode(bytes));
+      if (m.method === "hello") send(m.id, { device: "robolab-jetson", protocol: 1, provider: "ollama", ready: true });
+      else if (m.method === "generate") {
+        const controller = new AbortController(); jobs.set(m.id, controller);
+        void generateLocal(controller.signal).then(result => send(m.id, result)).catch(() => send(m.id, null, "BUSY"));
+      } else if (m.method === "cancel") jobs.get(m.params.requestId)?.abort();
+      else send(m.id, { alive: true });
+    } }),
+    open: vi.fn(async () => {}), close: vi.fn(async () => {}),
+  };
+  const requestPort = vi.fn(async () => port);
+  vi.stubGlobal("navigator", { ...navigator, serial: { requestPort } });
+  return { input, requestPort };
+}
+async function connectUsb() {
+  fireEvent.click(screen.getByRole("button", { name: "Jetson por USB" }));
+  expect(propose().disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Conectar Jetson" }));
+  await screen.findByText(/Jetson conectada/);
+}
+it("elige el puerto USB y muestra solo lo certificado por Convex antes de guardar", async () => {
+  const draft = { ...M(2), title: "Sin verificar" };
+  const certified = { ...proposal(2), mission: { ...M(2), title: "Huerto certificado" } };
+  const device = usbDevice(async () => ({ missions: [draft], failed: [] }));
+  reviewLocal.mockResolvedValue({ status: "ok", proposals: [certified], failed: [] });
+  status.mockReturnValue({ configured: false });
+  renderPage(); type(); await connectUsb();
+  expect(device.requestPort).toHaveBeenCalledTimes(1);
+  fireEvent.click(propose()); await screen.findByText("Huerto certificado");
+  expect(screen.queryByText("Sin verificar")).toBeNull(); expect(generate).not.toHaveBeenCalled();
+  expect(reviewLocal).toHaveBeenCalledWith({ objective: OBJETIVO, grades: [2, 3], difficulty: "balanced", missions: [draft] });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar y asignar a una clase" }));
+  await screen.findByText("Guardamos tu misión"); expect(save).toHaveBeenCalledWith({ mission: certified.mission });
+});
+it("conserva el aprendizaje al retirar el cable sin pasar a la nube", async () => {
+  const device = usbDevice(); renderPage(); type(); await connectUsb();
+  device.input.error(new Error("USB retirado"));
+  await screen.findByText(/Se perdió la conexión USB/);
+  expect((screen.getByLabelText("Aprendizaje") as HTMLTextAreaElement).value).toBe(OBJETIVO);
+  expect(generate).not.toHaveBeenCalled(); expect(propose().disabled).toBe(true);
+});
+it("explica un dispositivo ocupado sin recurrir a la nube", async () => {
+  usbDevice(async () => { throw new Error("BUSY"); });
+  renderPage(); type(); await connectUsb(); fireEvent.click(propose());
+  expect(await screen.findByRole("alert")).toHaveProperty("textContent", "La Jetson está generando otra misión. Espera a que termine.");
+  expect(generate).not.toHaveBeenCalled();
+});
+it("mantiene una sola regeneración local y la cancela al salir", async () => {
+  let posts = 0; let pendingSignal: AbortSignal | undefined;
+  usbDevice(async signal => {
+    if (++posts === 1) return { missions: [M(2)], failed: [] };
+    pendingSignal = signal; return new Promise(() => {});
+  });
+  reviewLocal.mockResolvedValue({ status: "ok", proposals: [proposal(2)], failed: [] });
+  renderPage(); type(); await connectUsb(); fireEvent.click(propose());
+  await screen.findByRole("heading", { name: "Revisa las propuestas" });
+  fireEvent.click(screen.getByRole("button", { name: /Pedir otra propuesta/ }));
+  await waitFor(() => expect(pendingSignal).toBeTruthy());
+  expect((screen.getByRole("button", { name: "Atrás" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "Guardar y asignar a una clase" }) as HTMLButtonElement).disabled).toBe(true);
+  cleanup(); await waitFor(() => expect(pendingSignal?.aborted).toBe(true));
+});
+it("explica un mapa inválido sin culpar al aprendizaje", async () => {
+  usbDevice(async () => ({ missions: [], failed: [{ grade: 2, code: "UNSOLVABLE" }] }));
+  renderPage(); type(); await connectUsb(); fireEvent.click(propose());
+  expect(await screen.findByRole("heading", { name: /El mapa no pasó la revisión/ })).toBeTruthy();
+  expect((screen.getByLabelText("Aprendizaje") as HTMLTextAreaElement).value).toBe(OBJETIVO);
 });

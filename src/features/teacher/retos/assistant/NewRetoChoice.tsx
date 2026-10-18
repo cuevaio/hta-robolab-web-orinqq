@@ -8,7 +8,7 @@ import "../retos.css";
 export const GAME_PATH = "/docente/retos/nuevo/juego";
 export const ASSISTANT_PATH = "/docente/retos/nuevo/asistente";
 
-/** G1: dos caminos para crear un reto. El asistente solo se ofrece si el servidor lo tiene activado. */
+/** G1: dos caminos para crear un reto. El asistente puede usar la nube o una Jetson local. */
 export function NewRetoChoice() {
   usePageTitle("Nuevo reto");
   const status = useQuery(api.agent.status);
@@ -38,7 +38,7 @@ export function NewRetoChoice() {
           </span>
           <span className="badge badge-ok way-badge">IA</span>
           <h2>Crear una misión con el asistente</h2>
-          {available ? (
+          {(
             <>
               <p>Cuéntale qué quieres que aprendan y propone misiones de Primaria (2.º a 4.º). El servidor comprueba que se puedan resolver.</p>
               <div>
@@ -47,9 +47,8 @@ export function NewRetoChoice() {
                 </Link>
               </div>
             </>
-          ) : (
-            <p role="status">El asistente aún no está activado. Pide a quien administra RoboLab que lo active; mientras, puedes elegir un juego ya hecho.</p>
           )}
+          {!available && <p className="small" role="status">La nube aún no está activada. Puedes generar con una Jetson conectada por USB.</p>}
         </article>
       </div>
       <p className="way-note">

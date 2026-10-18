@@ -30,11 +30,11 @@ describe("Nuevo reto: dos caminos (G1)", () => {
     expect(screen.getByText(/El asistente propone; tú decides/)).toBeTruthy();
   });
 
-  it("si el servidor no tiene el asistente activado lo dice y no ofrece el camino", () => {
+  it("si la nube no está activada mantiene el camino para una Jetson local", () => {
     status.mockReturnValue({ configured: false });
     render(page());
-    expect(screen.queryByRole("link", { name: /Crear con el asistente/ })).toBeNull();
-    expect(screen.getByRole("status").textContent).toMatch(/aún no está activado/);
+    expect(screen.getByRole("link", { name: /Crear con el asistente/ })).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toMatch(/La nube aún no está activada/);
     // El camino de siempre sigue disponible.
     expect(screen.getByRole("link", { name: /Empecemos/ })).toBeTruthy();
   });
@@ -42,7 +42,7 @@ describe("Nuevo reto: dos caminos (G1)", () => {
   it("mientras carga el estado no muestra el aviso de «no activado»", () => {
     status.mockReturnValue(undefined);
     render(page());
-    expect(screen.queryByText(/aún no está activado/)).toBeNull();
+    expect(screen.queryByText(/La nube aún no está activada/)).toBeNull();
     expect(screen.getByRole("link", { name: /Crear con el asistente/ })).toBeTruthy();
   });
 });
