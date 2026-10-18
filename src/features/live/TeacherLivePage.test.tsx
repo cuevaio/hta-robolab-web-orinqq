@@ -26,6 +26,19 @@ function show() {
 }
 
 describe("crear una partida en vivo", () => {
+  it("Clase, Laberinto y Cómo jugar tienen el mismo formato que los demás campos: etiqueta arriba y recuadro de selección", () => {
+    show();
+    for (const name of ["Clase", "Laberinto", "Cómo jugar"]) {
+      const select = screen.getByLabelText(name) as HTMLSelectElement;
+      expect(select.tagName).toBe("SELECT");
+      expect(select.classList.contains("select")).toBe(true);
+      const label = document.querySelector<HTMLLabelElement>(`label[for="${select.id}"]`)!;
+      expect(label.textContent).toBe(name);
+      expect(label.contains(select)).toBe(false);
+      expect(label.parentElement!.classList.contains("field")).toBe(true);
+    }
+  });
+
   it("permite elegir carrera o equipo y abre la sala que devuelve el servidor", async () => {
     show();
     expect((screen.getByRole("button", { name: "Crear sala de espera" }) as HTMLButtonElement).disabled).toBe(true);

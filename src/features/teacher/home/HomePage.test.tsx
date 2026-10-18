@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { getFunctionName } from "convex/server";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,6 +29,7 @@ vi.mock("convex/react", () => ({
   useMutation: () => ensureJoinCodes,
 }));
 
+import { ToastProvider } from "../../../shared/ui/Toast";
 import { HomePage } from "./HomePage";
 
 beforeEach(() => {
@@ -42,9 +43,11 @@ afterEach(() => {
 
 const renderHome = () =>
   render(
-    <MemoryRouter>
-      <HomePage />
-    </MemoryRouter>,
+    <ToastProvider>
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>
+    </ToastProvider>,
   );
 
 describe("inicio del docente (T2)", () => {
@@ -70,6 +73,27 @@ describe("inicio del docente (T2)", () => {
     expect(classes.getByText("Código MAT-915")).toBeTruthy();
     expect((classes.getByRole("link", { name: /nueva clase/i }) as HTMLAnchorElement).getAttribute("href")).toBe("/docente/clases/nueva");
     expect(ensureJoinCodes).not.toHaveBeenCalled();
+  });
+
+  it("junto a cada código hay un botón «Copiar» que lo copia y lo avisa", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    renderHome();
+    const classes = within(screen.getByRole("heading", { name: "Mis clases" }).closest("section")!);
+    const buttons = classes.getAllByRole("button", { name: /^Copiar el código/ });
+    expect(buttons.map((b) => b.textContent?.trim())).toEqual(["Copiar", "Copiar"]);
+    // El botón va al lado del código de su clase.
+    expect(buttons[0]!.closest("li")!.textContent).toContain("Código TEC-482");
+    fireEvent.click(classes.getByRole("button", { name: "Copiar el código MAT-915" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("MAT-915"));
+    expect(await screen.findByText("Código MAT-915 copiado.")).toBeTruthy();
+  });
+
+  it("si el navegador no deja copiar, lo explica", async () => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn().mockRejectedValue(new Error("no")) } });
+    renderHome();
+    fireEvent.click(screen.getByRole("button", { name: "Copiar el código TEC-482" }));
+    expect(await screen.findByText(/No se pudo copiar/)).toBeTruthy();
   });
 
   it("una clase anterior a los códigos pide el suyo y mientras tanto avisa", () => {

@@ -82,6 +82,28 @@
   text-decoration: underline;
 }
 
+/* Mis clases: en pantallas angostas el código y «Copiar» bajan debajo del nombre en vez de recortarlo. */
+.home-class {
+  flex-wrap: wrap;
+}
+
+.home-class .home-item-text {
+  flex: 1 1 10rem;
+}
+
+.home-class .home-code {
+  margin-left: auto;
+}
+
+/* El código de la clase y su botón «Copiar», juntos a la derecha de la clase. */
+.home-code {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
 .code-badge {
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
   letter-spacing: 0.06em;
