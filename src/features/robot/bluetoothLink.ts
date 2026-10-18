@@ -13,10 +13,20 @@ export interface SerialPortLike {
 export interface SerialApi {
   requestPort(options: { filters: { bluetoothServiceClassId: number }[] }): Promise<SerialPortLike>;
 }
+export type BluetoothDiagnostic = {
+  readonly stage: "select" | "open" | "handshake";
+  readonly name: string;
+  readonly message: string;
+};
+
+// Una nueva pantalla usa el mismo navegador: debe esperar el cierre de la anterior.
+const serialClosures = new WeakMap<SerialApi, Promise<void>>();
+
 export type BluetoothSnapshot = {
   readonly state: "off" | "searching" | "on";
   readonly busy: boolean;
   readonly error: string | null;
+  readonly diagnostic: BluetoothDiagnostic | null;
   readonly commands: string | null;
   readonly turns: "arc" | "pivot" | null;
   readonly last: { readonly id: string; readonly letters: string; readonly status: "sending" | "received" | "running" | "done" | "failed"; readonly error?: string } | null;
@@ -55,7 +65,7 @@ export function createBluetoothLink({
   leaseMs = BLUETOOTH_LEASE_MS,
 }: Options = {}) {
   const supported = !!serial && secure;
-  let snapshot: BluetoothSnapshot = { state: "off", busy: false, error: null, commands: null, turns: null, last: null };
+  let snapshot: BluetoothSnapshot = { state: "off", busy: false, error: null, diagnostic: null, commands: null, turns: null, last: null };
   const listeners = new Set<() => void>();
   const update = (next: Partial<BluetoothSnapshot>) => {
     snapshot = { ...snapshot, ...next };
@@ -66,6 +76,7 @@ export function createBluetoothLink({
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   let writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
   let reading: Promise<void> | null = null;
+  let opening: Promise<void> | null = null;
   let closing = Promise.resolve();
   let heartbeat: ReturnType<typeof setInterval> | undefined;
   let deadline: ReturnType<typeof setTimeout> | undefined;
@@ -80,19 +91,23 @@ export function createBluetoothLink({
     await writer.write(encoder.encode(text));
   };
 
-  function shutdown(error: string | null, sendStop = true) {
+  function shutdown(error: string | null, sendStop = true, diagnostic: BluetoothDiagnostic | null = null) {
     ++generation;
     clearInterval(heartbeat); clearTimeout(deadline); clearTimeout(helloTimer);
     helloReject?.(new Error(error ?? "Conexión cancelada."));
     helloResolve = undefined; helloReject = undefined;
-    const currentPort = port, currentReader = reader, currentWriter = writer, currentReading = reading;
-    port = null; reader = null; writer = null; reading = null;
-    update({ state: "off", busy: false, error, commands: null, turns: null,
+    const currentPort = port, currentReader = reader, currentWriter = writer, currentReading = reading, currentOpening = opening;
+    port = null; reader = null; writer = null; reading = null; opening = null;
+    update({ state: "off", busy: false, error, diagnostic, commands: null, turns: null,
       ...(snapshot.busy && snapshot.last ? { last: { ...snapshot.last, status: "failed", error: error ? "DISCONNECTED" : "STOPPED" } } : {}),
     });
     const previousClosing = closing;
+    const previousScreenClosing = serial ? serialClosures.get(serial) : undefined;
     closing = (async () => {
       await previousClosing;
+      await previousScreenClosing;
+      // open() no se puede cancelar: si termina tarde, cerramos antes de reutilizarlo.
+      await currentOpening?.catch(() => {});
       if (sendStop && currentWriter) {
         // Un cierre no queda esperando indefinidamente una escritura atascada.
         let timer: ReturnType<typeof setTimeout> | undefined;
@@ -103,10 +118,12 @@ export function createBluetoothLink({
         clearTimeout(timer);
       }
       await currentReader?.cancel().catch(() => {});
-      await currentReading;
+      if (currentReading) await currentReading;
+      else currentReader?.releaseLock();
       currentWriter?.releaseLock();
       await currentPort?.close().catch(() => {});
     })();
+    if (serial) serialClosures.set(serial, closing);
     return closing;
   }
 
@@ -173,19 +190,26 @@ export function createBluetoothLink({
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     async connect() {
       if (snapshot.state !== "off") return;
-      if (!supported) { update({ error: "Abre RoboLab en Chrome de laptop por HTTPS o localhost para usar Bluetooth Classic." }); return; }
+      if (!supported) { update({ error: "Bluetooth Classic necesita Chrome o Edge en computadora con HTTPS o localhost." }); return; }
       const current = ++generation;
-      update({ state: "searching", error: null, last: null });
+      update({ state: "searching", error: null, diagnostic: null, last: null });
       let selected: SerialPortLike | undefined;
+      let stage: BluetoothDiagnostic["stage"] = "select";
       try {
         // El selector se abre dentro del gesto del usuario, antes de cualquier otra espera.
         selected = await serial!.requestPort({ filters: [{ bluetoothServiceClassId: 0x1101 }] });
         if (current !== generation) return;
+        stage = "open";
+        const previousScreenClosing = serialClosures.get(serial!);
         await closing;
+        await previousScreenClosing;
         if (current !== generation) return;
-        await selected.open({ baudRate: 115200 });
-        if (current !== generation) { await selected.close(); return; }
         port = selected;
+        opening = selected.open({ baudRate: 115200 });
+        await opening;
+        if (current !== generation) return; // shutdown es dueño de la apertura cancelada.
+        opening = null;
+        stage = "handshake";
         if (!port.readable || !port.writable) throw new Error("No pudimos abrir el puerto del robot.");
         reader = port.readable.getReader(); writer = port.writable.getWriter();
         const hello = new Promise<void>((resolve, reject) => {
@@ -203,14 +227,21 @@ export function createBluetoothLink({
         }, BLUETOOTH_HEARTBEAT_MS);
       } catch (error) {
         if (current !== generation) return;
-        const cancelled = error instanceof Error && error.name === "NotFoundError";
-        const denied = error instanceof Error && ["SecurityError", "NotAllowedError"].includes(error.name);
+        const failure = error instanceof Error || error instanceof DOMException ? error : null;
+        const cancelled = stage === "select" && failure?.name === "NotFoundError";
+        const denied = failure && ["SecurityError", "NotAllowedError"].includes(failure.name);
         const message = cancelled ? null : denied
           ? "No tenemos permiso para abrir el puerto. Revisa los permisos del navegador y usa HTTPS o localhost."
-          : error instanceof DOMException
-            ? "No pudimos abrir el puerto. Cierra otras aplicaciones que lo usen y revisa el emparejamiento."
-            : error instanceof Error ? error.message : "No pudimos abrir Bluetooth. Revisa el emparejamiento y los permisos.";
-        await shutdown(message, false);
+          : stage === "open" && error instanceof DOMException
+            ? error.name === "InvalidStateError"
+              ? "El puerto del robot sigue ocupado. Desconéctalo en las otras pestañas o navegadores y vuelve a elegirlo."
+              : "No pudimos abrir Bluetooth. Comprueba que RoboLab esté encendido y cerca. Cierra su conexión en otras pestañas o navegadores. Si continúa, apaga y enciende el robot y revisa su emparejamiento."
+            : failure ? failure.message : "No pudimos abrir Bluetooth. Revisa el emparejamiento y los permisos.";
+        const diagnostic = cancelled ? null : {
+          stage, name: failure?.name ?? "Error",
+          message: failure?.message ?? "Error desconocido.",
+        };
+        await shutdown(message, false, diagnostic);
       }
     },
     async send(sequence: string) {

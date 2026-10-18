@@ -227,8 +227,9 @@ wifi para recibir los movimientos. El modo **Wifi** conserva la conexión por c�
 
 1. Cargar el sketch completo `firmware/robi/robi.ino` del backend. Incluye los
    motores, ojos, luces y sonidos en un solo archivo; no necesita copiar `.h`.
-2. Emparejar **RoboLab** en los ajustes Bluetooth de la laptop.
-3. Abrir la web por HTTPS o localhost en Chrome de escritorio (117 o superior).
+2. Emparejar **RoboLab** una vez en los ajustes Bluetooth de la computadora.
+   Puede quedar como desconectado en Ubuntu: el puerto se abre desde la web.
+3. Abrir la web por HTTPS o localhost en Chrome o Edge de escritorio actualizado.
 4. En el reto, tocar **Robot → Elegir robot** y seleccionar su puerto Bluetooth.
    El chip solo cambia a conectado después de que responde el firmware.
 
@@ -246,7 +247,20 @@ El contrato, pines y pruebas de aceptación están en
 [robot-bluetooth.md del backend](https://github.com/orinqq/robolab-backend/blob/main/docs/robot-bluetooth.md).
 El lockfile fija el commit del backend oficial por `git+https`.
 La API requiere un navegador con Web Serial;
-si no está disponible, se muestra la alternativa Wifi.
+si no está disponible, se muestra la alternativa Wifi. Firefox y Zen no ofrecen
+esta conexión Bluetooth Classic de forma nativa.
+
+Al volver a conectar, la web espera que termine de cerrarse el puerto anterior,
+también al cambiar de reto. Usa el robot en una sola pestaña o navegador a la vez.
+Si falla, **Detalles de conexión** conserva la etapa y el error del navegador.
+Comprueba que RoboLab esté encendido y cerca, desconéctalo de otros equipos y
+reinícialo. En Ubuntu, si tampoco aparece al buscar dispositivos y el sistema
+informa `Host is down` o `br-connection-page-timeout`, hay que recuperar primero
+el enlace Bluetooth del sistema. Las advertencias `Serial blocklist` sobre
+servicios de audio de otros dispositivos no indican un fallo del puerto SPP de RoboLab.
+
+Referencias: [Bluetooth RFCOMM con Web Serial](https://developer.chrome.com/blog/serial-over-bluetooth)
+y [compatibilidad de Web Serial](https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API).
 
 ## Pruebas y calidad
 
