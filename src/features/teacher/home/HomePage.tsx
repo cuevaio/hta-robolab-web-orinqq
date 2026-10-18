@@ -6,6 +6,7 @@ import { Icon } from "../../../shared/ui/Icon";
 import { usePageTitle } from "../../../shared/usePageTitle";
 import { LEVEL_INFO } from "../../explore/ExploreLayout";
 import { emojiFor } from "../../explore/catalog";
+import { useCopyCode } from "../classes/CodeChip";
 import { useEnsureJoinCodes } from "../classes/useEnsureJoinCodes";
 import "./home.css";
 
@@ -15,6 +16,7 @@ const SHOWN_CHALLENGES = 6;
 export function HomePage() {
   usePageTitle("Inicio");
   const home = useQuery(api.teacherHome.home);
+  const copy = useCopyCode();
   const available = useQuery(api.assignments.available);
   useEnsureJoinCodes(home?.classes.some((c) => c.joinCode === null) ?? false);
 
@@ -98,7 +100,7 @@ export function HomePage() {
           ) : (
             <ul className="home-list">
               {home.classes.map((c) => (
-                <li key={c._id} className="home-item">
+                <li key={c._id} className="home-item home-class">
                   <span className="home-item-text">
                     <Link to={`/docente/clases/${c._id}`}>{c.label}</Link>
                     <span className="small muted">
@@ -108,7 +110,12 @@ export function HomePage() {
                   {c.joinCode === null ? (
                     <span className="badge badge-muted">Generando código…</span>
                   ) : (
-                    <span className="badge code-badge">Código {c.joinCode}</span>
+                    <span className="home-code">
+                      <span className="badge code-badge">Código {c.joinCode}</span>
+                      <button type="button" className="btn btn-sm" aria-label={`Copiar el código ${c.joinCode}`} onClick={() => void copy(c.joinCode!)}>
+                        <Icon name="copy" size={16} /> Copiar
+                      </button>
+                    </span>
                   )}
                 </li>
               ))}
