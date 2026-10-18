@@ -30,7 +30,7 @@ describe("jugar una misión del asistente", () => {
   it("muestra la consigna, el tablero, la energía y la bandeja de piezas de siempre", () => {
     render(<MissionPlayer mission={MISSION} />);
     expect(screen.getByRole("heading", { level: 1, name: "Lleva los libros." })).toBeTruthy();
-    expect(board()).toMatch(/Tablero de 1 por 4\. Kusi está en la fila 1, columna 1, mirando a la derecha\./);
+    expect(board()).toMatch(/Tablero de 1 por 4\. Robi está en la fila 1, columna 1, mirando a la derecha\./);
     expect(screen.getByText(/Energía: 3 de 3/)).toBeTruthy();
     expect(within(screen.getByRole("group", { name: "Piezas" })).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
       "Avanzar",
@@ -46,7 +46,7 @@ describe("jugar una misión del asistente", () => {
     render(<MissionPlayer mission={MISSION} onSolved={onSolved} />);
     for (let i = 0; i < 3; i++) piece("Avanzar");
     run();
-    expect(status()).toMatch(/Mira cómo se mueve Kusi/);
+    expect(status()).toMatch(/Mira cómo se mueve Robi/);
     play(STEP_MS);
     expect(board()).toMatch(/columna 2/);
     expect(screen.getByText(/Energía: 2 de 3/)).toBeTruthy();
